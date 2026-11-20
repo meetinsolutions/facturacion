@@ -3,6 +3,73 @@ import * as path from 'path';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 
+export type EstiloFacturaPreset =
+  | 'ejecutivo'
+  | 'corporativo'
+  | 'noir'
+  | 'minimalista'
+  | 'moderno'
+  | 'clasico-cr';
+
+export type DisenoLayoutHeader = 'clasico' | 'centrado' | 'compacto' | 'banda-lateral';
+export type DisenoEstiloTabla = 'moderno' | 'rayado' | 'cuadricula' | 'minimalista';
+export type DisenoFuente = 'jakarta' | 'inter' | 'poppins' | 'playfair' | 'merriweather' | 'mono';
+export type DisenoTamanoPapel = 'letter' | 'a4';
+
+export interface DisenoFacturaConfig {
+  plantillaBase?: EstiloFacturaPreset;
+  layoutHeader?: DisenoLayoutHeader;
+  estiloTabla?: DisenoEstiloTabla;
+
+  colorPrimario?: string;
+  colorAcento?: string;
+  colorFondoHeader?: string;
+  colorTextoHeader?: string;
+  colorFondoTablaHead?: string;
+  colorTextoTablaHead?: string;
+  colorFondoTarjetas?: string;
+  colorBorde?: string;
+
+  fuente?: DisenoFuente;
+  tamanoBasePx?: number;
+  radioBordesPx?: number;
+  mostrarFranjaSuperior?: boolean;
+  grosorFranjaPx?: number;
+  logoAltoPx?: number;
+  logoAnchoMaxPx?: number;
+  logoFondoBlanco?: boolean;
+  tamanoPapel?: DisenoTamanoPapel;
+  margenImpresionMm?: number;
+
+  mostrarLogo?: boolean;
+  mostrarRazonSocial?: boolean;
+  mostrarActividadEconomica?: boolean;
+  mostrarSucursalTerminal?: boolean;
+  mostrarDireccionEmisor?: boolean;
+  mostrarTelefonoCorreoEmisor?: boolean;
+  mostrarCabys?: boolean;
+  mostrarUnidadMedida?: boolean;
+  mostrarNumeroLinea?: boolean;
+  mostrarColumnaIVA?: boolean;
+  mostrarQR?: boolean;
+  mostrarClaveNumerica?: boolean;
+  mostrarDetallesOperacion?: boolean;
+  mostrarResolucionLegal?: boolean;
+  mostrarFirmaRecibido?: boolean;
+  mostrarMarcaAgua?: boolean;
+  textoMarcaAgua?: string;
+
+  tituloPersonalizado?: string;
+  etiquetaCliente?: string;
+  etiquetaOperacion?: string;
+  etiquetaTotal?: string;
+  tituloCuentasBancarias?: string;
+  textoCuentasBancarias?: string;
+  textoNotasFijas?: string;
+  mensajePie?: string;
+  textoResolucionLegal?: string;
+}
+
 export interface ConfiguracionSistema {
   emisor: {
     nombre: string;
@@ -24,7 +91,8 @@ export interface ConfiguracionSistema {
     logoBase64: string;
     colorPrimario: string;
     mensajePieTicket: string;
-    estiloFactura?: 'ejecutivo' | 'corporativo' | 'noir';
+    estiloFactura?: EstiloFacturaPreset;
+    disenoFactura?: DisenoFacturaConfig;
     tipoCambioDefault?: number;
   };
   hacienda: {
@@ -137,7 +205,7 @@ export interface ComprobanteGuardado {
   total: number;
   cliente: string;
   estadoHacienda: string;
-  estilo?: 'ejecutivo' | 'corporativo' | 'noir';
+  estilo?: EstiloFacturaPreset;
   notas?: string;
   correoCliente?: string;
   correoEnviado?: boolean;

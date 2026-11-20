@@ -25,7 +25,10 @@ function resolverRutaNavegador(): string {
   throw new Error('No se encontró Google Chrome o Microsoft Edge instalado para generar el PDF. Configure CHROME_PATH.');
 }
 
-export async function generarFacturaPDFBuffer(html: string): Promise<Buffer> {
+export async function generarFacturaPDFBuffer(
+  html: string,
+  options?: { format?: 'Letter' | 'A4' }
+): Promise<Buffer> {
   const executablePath = resolverRutaNavegador();
   const browser = await puppeteer.launch({
     executablePath,
@@ -42,7 +45,7 @@ export async function generarFacturaPDFBuffer(html: string): Promise<Buffer> {
     }
     await page.emulateMediaType('print');
     const pdf = await page.pdf({
-      format: 'Letter',
+      format: options?.format || 'Letter',
       printBackground: true,
       preferCSSPageSize: true
     });

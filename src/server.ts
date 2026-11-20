@@ -17,7 +17,13 @@ import {
 } from './types/factura.types.js';
 import { ConfiguracionSistema, ComprobanteGuardado } from './services/data-store.js';
 import { pgDataStore } from './services/pg-data-store.js';
-import { generarFacturaEleganteHTML, EstiloFactura } from './services/factura-renderer.js';
+import {
+  generarFacturaEleganteHTML,
+  EstiloFactura,
+  ESTILOS_FACTURA_VALIDOS,
+  PLANTILLAS_FACTURA_PRESETS,
+  resolverDisenoFactura
+} from './services/factura-renderer.js';
 import { generarFacturaPDFBuffer } from './services/pdf-generator.js';
 import { enviarComprobantePorCorreo, probarConexionCorreo } from './services/email-service.js';
 import { parsearFacturaXMLCostaRica } from './services/xml-expense-parser.js';
@@ -616,21 +622,40 @@ app.get('/api/estado', ah(async (req, res) => {
   });
 }));
 
-// Vista previa en HTML elegante antes de emitir
+// Presets oficiales del Editor Visual de Factura
+app.get('/api/factura/editor-presets', ah(async (req, res) => {
+  const config = await pgDataStore.getConfig(tid(req));
+  const disenoActual = resolverDisenoFactura(config);
+  res.json({
+    success: true,
+    data: {
+      presets: PLANTILLAS_FACTURA_PRESETS,
+      disenoActual
+    }
+  });
+}));
+
+// Vista previa en HTML elegante antes de emitir (también usada por el Editor Visual de Factura)
 app.post('/api/factura/preview', async (req: Request, res: Response) => {
   try {
-    const config = await pgDataStore.getConfig(tid(req));
+    const configBase = await pgDataStore.getConfig(tid(req));
+    const config: ConfiguracionSistema =
+      typeof req.body.logoBase64Override === 'string'
+        ? { ...configBase, sitio: { ...configBase.sitio, logoBase64: req.body.logoBase64Override } }
+        : configBase;
     const doc = construirComprobanteDesdePayload(req.body, config);
-    const estilo = (req.body.estilo || config.sitio?.estiloFactura || 'ejecutivo') as EstiloFactura;
+    const estilo = (req.body.estilo || config.sitio?.disenoFactura?.plantillaBase || config.sitio?.estiloFactura || 'ejecutivo') as EstiloFactura;
 
     const html = await generarFacturaEleganteHTML({
       clave: '50600000000000000000000000000000000000000000000000',
-      consecutivo: '00100001010000000000',
+      consecutivo: '00100001010000000042',
       doc,
       config,
       estilo,
+      disenoOverride: req.body.diseno,
       notas: req.body.notas,
-      esBorrador: true
+      esBorrador: req.body.esBorrador !== false,
+      ocultarBarraAcciones: Boolean(req.body.ocultarBarraAcciones)
     });
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -640,15 +665,50 @@ app.post('/api/factura/preview', async (req: Request, res: Response) => {
   }
 });
 
+// Descargar PDF de prueba desde el Editor Visual de Factura (con diseño en vivo sin guardar)
+app.post('/api/factura/preview-pdf', async (req: Request, res: Response) => {
+  try {
+    const configBase = await pgDataStore.getConfig(tid(req));
+    const config: ConfiguracionSistema =
+      typeof req.body.logoBase64Override === 'string'
+        ? { ...configBase, sitio: { ...configBase.sitio, logoBase64: req.body.logoBase64Override } }
+        : configBase;
+    const doc = construirComprobanteDesdePayload(req.body, config);
+    const estilo = (req.body.estilo || config.sitio?.disenoFactura?.plantillaBase || config.sitio?.estiloFactura || 'ejecutivo') as EstiloFactura;
+    const disenoResuelto = resolverDisenoFactura(config, estilo, req.body.diseno);
+
+    const html = await generarFacturaEleganteHTML({
+      clave: '50619112600010663089600100001010000000042110958315',
+      consecutivo: '00100001010000000042',
+      doc,
+      config,
+      estilo,
+      disenoOverride: req.body.diseno,
+      notas: req.body.notas,
+      esBorrador: true,
+      ocultarBarraAcciones: true
+    });
+
+    const pdfBuffer = await generarFacturaPDFBuffer(html, {
+      format: disenoResuelto.tamanoPapel === 'a4' ? 'A4' : 'Letter'
+    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="VistaPrevia_Factura.pdf"');
+    res.send(pdfBuffer);
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: `Error generando PDF de prueba: ${error.message}` });
+  }
+});
+
 async function generarPDFParaComprobante(
   item: ComprobanteGuardado,
   config: ConfiguracionSistema,
   estiloOverride?: EstiloFactura
 ): Promise<Buffer> {
-  const estilosValidos: EstiloFactura[] = ['ejecutivo', 'corporativo', 'noir'];
-  const estilo: EstiloFactura = estiloOverride && estilosValidos.includes(estiloOverride)
+  const estilo: EstiloFactura = estiloOverride && ESTILOS_FACTURA_VALIDOS.includes(estiloOverride)
     ? estiloOverride
-    : item.estilo || config.sitio?.estiloFactura || 'ejecutivo';
+    : config.sitio?.disenoFactura?.plantillaBase || item.estilo || config.sitio?.estiloFactura || 'ejecutivo';
+  const disenoResuelto = resolverDisenoFactura(config, estilo);
 
   const html = await generarFacturaEleganteHTML({
     clave: item.clave,
@@ -659,7 +719,9 @@ async function generarPDFParaComprobante(
     notas: item.notas
   });
 
-  return generarFacturaPDFBuffer(html);
+  return generarFacturaPDFBuffer(html, {
+    format: disenoResuelto.tamanoPapel === 'a4' ? 'A4' : 'Letter'
+  });
 }
 
 // Emitir y firmar comprobante
@@ -811,10 +873,9 @@ app.get('/api/facturas/:clave/print', ah(async (req, res) => {
 
   const config = await pgDataStore.getConfig(t);
   const estiloQuery = req.query.estilo as string | undefined;
-  const estilosValidos: EstiloFactura[] = ['ejecutivo', 'corporativo', 'noir'];
-  const estilo: EstiloFactura = estilosValidos.includes(estiloQuery as EstiloFactura)
+  const estilo: EstiloFactura = ESTILOS_FACTURA_VALIDOS.includes(estiloQuery as EstiloFactura)
     ? (estiloQuery as EstiloFactura)
-    : item.estilo || config.sitio?.estiloFactura || 'ejecutivo';
+    : config.sitio?.disenoFactura?.plantillaBase || item.estilo || config.sitio?.estiloFactura || 'ejecutivo';
 
   const html = await generarFacturaEleganteHTML({
     clave: item.clave,

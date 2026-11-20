@@ -101,6 +101,11 @@
           <span>Nuevo Documento</span>
         </button>
 
+        <button onclick="cambiarModulo('editor-factura')" id="nav-editor-factura" class="nav-item w-full flex items-center space-x-3 px-3.5 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-wand-magic-sparkles w-5 text-sm"></i>
+          <span>Editor de Factura</span>
+        </button>
+
         <button onclick="cambiarModulo('historial')" id="nav-historial" class="nav-item w-full flex items-center space-x-3 px-3.5 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
           <i class="fa-solid fa-receipt w-5 text-sm"></i>
           <span>Comprobantes Emitidos</span>
@@ -202,39 +207,69 @@
 
             <!-- 1. Selector de Plantilla Visual -->
             <section class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-              <div class="flex items-center justify-between">
+              <div class="flex items-center justify-between gap-2">
                 <h3 class="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center space-x-2">
                   <i class="fa-solid fa-palette text-emerald-600"></i>
                   <span>Estilo Visual de la Factura</span>
                 </h3>
-                <span class="text-[11px] text-slate-400 font-medium">Cambie y vea el diseño al instante</span>
+                <button type="button" onclick="cambiarModulo('editor-factura')" class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[11px] font-bold flex items-center space-x-1.5 transition">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i>
+                  <span>Personalizar Formato</span>
+                </button>
               </div>
 
-              <div class="grid grid-cols-3 gap-2.5">
-                <button type="button" onclick="seleccionarEstiloFactura('ejecutivo')" id="style-card-ejecutivo" class="style-card p-3 rounded-xl border-2 border-emerald-600 bg-emerald-50/50 text-left transition hover:shadow-sm">
-                  <div class="flex items-center justify-between mb-1.5">
-                    <span class="w-6 h-2 rounded-full bg-emerald-600"></span>
+              <div class="grid grid-cols-3 gap-2">
+                <button type="button" onclick="seleccionarEstiloFactura('minimalista')" id="style-card-minimalista" class="style-card p-2.5 rounded-xl border border-slate-200 bg-white text-left transition hover:border-slate-400 hover:shadow-sm">
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="w-6 h-1.5 rounded-full bg-slate-800"></span>
+                    <i class="fa-solid fa-circle-check text-slate-800 text-xs style-check hidden"></i>
+                  </div>
+                  <div class="text-[11px] font-black text-slate-900">Minimalista</div>
+                  <div class="text-[10px] text-slate-500">Limpio & ligero</div>
+                </button>
+
+                <button type="button" onclick="seleccionarEstiloFactura('clasico-cr')" id="style-card-clasico-cr" class="style-card p-2.5 rounded-xl border border-slate-200 bg-white text-left transition hover:border-blue-400 hover:shadow-sm">
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="w-6 h-1.5 rounded-full bg-blue-700"></span>
+                    <i class="fa-solid fa-circle-check text-blue-700 text-xs style-check hidden"></i>
+                  </div>
+                  <div class="text-[11px] font-black text-slate-900">Clásico CR</div>
+                  <div class="text-[10px] text-slate-500">Contable & firmas</div>
+                </button>
+
+                <button type="button" onclick="seleccionarEstiloFactura('ejecutivo')" id="style-card-ejecutivo" class="style-card p-2.5 rounded-xl border-2 border-emerald-600 bg-emerald-50/50 text-left transition hover:shadow-sm">
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="w-6 h-1.5 rounded-full bg-emerald-600"></span>
                     <i class="fa-solid fa-circle-check text-emerald-600 text-xs style-check"></i>
                   </div>
-                  <div class="text-xs font-black text-slate-900">Ejecutivo</div>
-                  <div class="text-[10px] text-slate-500">Blanco puro & Esmeralda</div>
+                  <div class="text-[11px] font-black text-slate-900">Ejecutivo</div>
+                  <div class="text-[10px] text-slate-500">Blanco & Esmeralda</div>
                 </button>
 
-                <button type="button" onclick="seleccionarEstiloFactura('corporativo')" id="style-card-corporativo" class="style-card p-3 rounded-xl border border-slate-200 bg-white text-left transition hover:border-sky-400 hover:shadow-sm">
-                  <div class="flex items-center justify-between mb-1.5">
-                    <span class="w-6 h-2 rounded-full bg-slate-900"></span>
+                <button type="button" onclick="seleccionarEstiloFactura('corporativo')" id="style-card-corporativo" class="style-card p-2.5 rounded-xl border border-slate-200 bg-white text-left transition hover:border-sky-400 hover:shadow-sm">
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="w-6 h-1.5 rounded-full bg-slate-900"></span>
                     <i class="fa-solid fa-circle-check text-sky-600 text-xs style-check hidden"></i>
                   </div>
-                  <div class="text-xs font-black text-slate-900">Corporativo</div>
-                  <div class="text-[10px] text-slate-500">Azul Marino & Contraste</div>
+                  <div class="text-[11px] font-black text-slate-900">Corporativo</div>
+                  <div class="text-[10px] text-slate-500">Azul Marino</div>
                 </button>
 
-                <button type="button" onclick="seleccionarEstiloFactura('noir')" id="style-card-noir" class="style-card p-3 rounded-xl border border-slate-200 bg-white text-left transition hover:border-amber-500 hover:shadow-sm">
-                  <div class="flex items-center justify-between mb-1.5">
-                    <span class="w-6 h-2 rounded-full bg-amber-500"></span>
+                <button type="button" onclick="seleccionarEstiloFactura('moderno')" id="style-card-moderno" class="style-card p-2.5 rounded-xl border border-slate-200 bg-white text-left transition hover:border-indigo-400 hover:shadow-sm">
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="w-6 h-1.5 rounded-full bg-indigo-600"></span>
+                    <i class="fa-solid fa-circle-check text-indigo-600 text-xs style-check hidden"></i>
+                  </div>
+                  <div class="text-[11px] font-black text-slate-900">Moderno</div>
+                  <div class="text-[10px] text-slate-500">Banda lateral</div>
+                </button>
+
+                <button type="button" onclick="seleccionarEstiloFactura('noir')" id="style-card-noir" class="style-card p-2.5 rounded-xl border border-slate-200 bg-white text-left transition hover:border-amber-500 hover:shadow-sm">
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="w-6 h-1.5 rounded-full bg-amber-500"></span>
                     <i class="fa-solid fa-circle-check text-amber-600 text-xs style-check hidden"></i>
                   </div>
-                  <div class="text-xs font-black text-slate-900">Noir & Dorado</div>
+                  <div class="text-[11px] font-black text-slate-900">Noir & Oro</div>
                   <div class="text-[10px] text-slate-500">Boutique Editorial</div>
                 </button>
               </div>
@@ -953,11 +988,19 @@
             </div>
             <div>
               <label class="block font-bold text-slate-700 mb-1">Estilo de Factura Predeterminado</label>
-              <select id="cfg-estilo-factura" class="w-full p-2.5 border rounded-xl focus:ring-2 focus:ring-emerald-500 bg-slate-50 font-bold">
-                <option value="ejecutivo">Ejecutivo Esmeralda</option>
-                <option value="corporativo">Corporativo Azul Marino</option>
-                <option value="noir">Boutique Noir & Dorado</option>
-              </select>
+              <div class="flex gap-2">
+                <select id="cfg-estilo-factura" class="flex-1 p-2.5 border rounded-xl focus:ring-2 focus:ring-emerald-500 bg-slate-50 font-bold">
+                  <option value="minimalista">Minimalista Limpio</option>
+                  <option value="clasico-cr">Clásico CR Contable</option>
+                  <option value="ejecutivo">Ejecutivo Esmeralda</option>
+                  <option value="corporativo">Corporativo Azul Marino</option>
+                  <option value="moderno">Moderno Editorial</option>
+                  <option value="noir">Boutique Noir & Dorado</option>
+                </select>
+                <button type="button" onclick="cambiarModulo('editor-factura')" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold whitespace-nowrap" title="Abrir Editor Visual de Factura">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i> Editar
+                </button>
+              </div>
             </div>
             <div>
               <label class="block font-bold text-slate-700 mb-1">Mensaje en Pie del Ticket / Factura</label>
@@ -1400,6 +1443,344 @@
         </div>
       </div>
 
+      <!-- ============================================================= -->
+      <!-- MODULO EDITOR VISUAL DE FACTURA (DISEÑADOR EN TIEMPO REAL)    -->
+      <!-- ============================================================= -->
+      <div id="modulo-editor-factura" class="modulo-vista h-full hidden flex overflow-hidden">
+
+        <!-- PANEL IZQUIERDO: CONTROLES DEL EDITOR -->
+        <div class="w-[460px] shrink-0 bg-white border-r border-slate-200 flex flex-col overflow-hidden">
+          <!-- Cabecera y Tabs -->
+          <div class="px-4 pt-4 pb-3 border-b border-slate-200 bg-slate-50/70 space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-sm font-black text-slate-900 flex items-center gap-2">
+                  <i class="fa-solid fa-wand-magic-sparkles text-indigo-600"></i>
+                  <span>Editor Visual de Factura</span>
+                </h2>
+                <p class="text-[11px] text-slate-500">Personalice el diseño y vea cada cambio en tiempo real</p>
+              </div>
+              <span id="ed-unsaved-badge" class="hidden px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">Sin guardar</span>
+            </div>
+
+            <div class="grid grid-cols-4 gap-1 bg-slate-200/70 p-1 rounded-xl text-[11px] font-bold">
+              <button type="button" onclick="tabEditorFactura('plantilla')" id="ed-tab-btn-plantilla" class="ed-tab-btn py-1.5 rounded-lg bg-white shadow text-slate-900 transition">1. Plantilla</button>
+              <button type="button" onclick="tabEditorFactura('colores')" id="ed-tab-btn-colores" class="ed-tab-btn py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">2. Colores</button>
+              <button type="button" onclick="tabEditorFactura('secciones')" id="ed-tab-btn-secciones" class="ed-tab-btn py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">3. Campos</button>
+              <button type="button" onclick="tabEditorFactura('textos')" id="ed-tab-btn-textos" class="ed-tab-btn py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">4. Textos</button>
+            </div>
+          </div>
+
+          <!-- Cuerpo Scrollable de Controles -->
+          <div class="flex-1 overflow-y-auto p-4 space-y-5 scrollbar-thin text-xs">
+
+            <!-- TAB 1: PLANTILLA Y ESTRUCTURA -->
+            <div id="ed-panel-plantilla" class="ed-panel space-y-5">
+              <div class="space-y-2">
+                <label class="block text-[11px] font-black uppercase tracking-wider text-slate-500">Plantillas Base (1 clic)</label>
+                <div class="grid grid-cols-2 gap-2" id="ed-presets-grid">
+                  <!-- Se llena dinámicamente -->
+                </div>
+              </div>
+
+              <div class="space-y-2">
+                <label class="block text-[11px] font-black uppercase tracking-wider text-slate-500">Distribución del Encabezado</label>
+                <div class="grid grid-cols-2 gap-2">
+                  <button type="button" onclick="setCampoEditor('layoutHeader', 'clasico')" data-ed-layout="clasico" class="ed-layout-btn p-2.5 rounded-xl border border-slate-200 text-left hover:border-indigo-400 transition">
+                    <div class="font-bold text-slate-800">Clásico (2 columnas)</div>
+                    <div class="text-[10px] text-slate-500">Logo izq · Folio derecha</div>
+                  </button>
+                  <button type="button" onclick="setCampoEditor('layoutHeader', 'centrado')" data-ed-layout="centrado" class="ed-layout-btn p-2.5 rounded-xl border border-slate-200 text-left hover:border-indigo-400 transition">
+                    <div class="font-bold text-slate-800">Centrado Editorial</div>
+                    <div class="text-[10px] text-slate-500">Logo y marca al centro</div>
+                  </button>
+                  <button type="button" onclick="setCampoEditor('layoutHeader', 'compacto')" data-ed-layout="compacto" class="ed-layout-btn p-2.5 rounded-xl border border-slate-200 text-left hover:border-indigo-400 transition">
+                    <div class="font-bold text-slate-800">Compacto</div>
+                    <div class="text-[10px] text-slate-500">Logo + datos en línea</div>
+                  </button>
+                  <button type="button" onclick="setCampoEditor('layoutHeader', 'banda-lateral')" data-ed-layout="banda-lateral" class="ed-layout-btn p-2.5 rounded-xl border border-slate-200 text-left hover:border-indigo-400 transition">
+                    <div class="font-bold text-slate-800">Banda Lateral</div>
+                    <div class="text-[10px] text-slate-500">Franja vertical de acento</div>
+                  </button>
+                </div>
+              </div>
+
+              <div class="space-y-2">
+                <label class="block text-[11px] font-black uppercase tracking-wider text-slate-500">Estilo de la Tabla de Artículos</label>
+                <div class="grid grid-cols-2 gap-2">
+                  <button type="button" onclick="setCampoEditor('estiloTabla', 'moderno')" data-ed-tabla="moderno" class="ed-tabla-btn p-2.5 rounded-xl border border-slate-200 text-left hover:border-indigo-400 transition">
+                    <div class="font-bold text-slate-800">Moderno</div>
+                    <div class="text-[10px] text-slate-500">Cabecera sólida y líneas</div>
+                  </button>
+                  <button type="button" onclick="setCampoEditor('estiloTabla', 'rayado')" data-ed-tabla="rayado" class="ed-tabla-btn p-2.5 rounded-xl border border-slate-200 text-left hover:border-indigo-400 transition">
+                    <div class="font-bold text-slate-800">Rayado (Zebra)</div>
+                    <div class="text-[10px] text-slate-500">Filas alternas sombreadas</div>
+                  </button>
+                  <button type="button" onclick="setCampoEditor('estiloTabla', 'cuadricula')" data-ed-tabla="cuadricula" class="ed-tabla-btn p-2.5 rounded-xl border border-slate-200 text-left hover:border-indigo-400 transition">
+                    <div class="font-bold text-slate-800">Cuadrícula Contable</div>
+                    <div class="text-[10px] text-slate-500">Bordes en todas las celdas</div>
+                  </button>
+                  <button type="button" onclick="setCampoEditor('estiloTabla', 'minimalista')" data-ed-tabla="minimalista" class="ed-tabla-btn p-2.5 rounded-xl border border-slate-200 text-left hover:border-indigo-400 transition">
+                    <div class="font-bold text-slate-800">Minimalista</div>
+                    <div class="text-[10px] text-slate-500">Sin relleno, líneas limpias</div>
+                  </button>
+                </div>
+              </div>
+
+              <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                <div class="text-[11px] font-black uppercase tracking-wider text-slate-500">Geometría & Papel PDF</div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="flex justify-between font-bold text-slate-700 mb-1"><span>Esquinas</span><span id="ed-val-radio" class="font-mono text-indigo-600">12px</span></label>
+                    <input id="ed-radioBordesPx" type="range" min="0" max="22" step="1" oninput="onCambioInputEditor()" class="w-full accent-indigo-600">
+                  </div>
+                  <div>
+                    <label class="flex justify-between font-bold text-slate-700 mb-1"><span>Franja superior</span><span id="ed-val-franja" class="font-mono text-indigo-600">4px</span></label>
+                    <input id="ed-grosorFranjaPx" type="range" min="0" max="12" step="1" oninput="onCambioInputEditor()" class="w-full accent-indigo-600">
+                  </div>
+                  <div>
+                    <label class="block font-bold text-slate-700 mb-1">Tamaño de Papel</label>
+                    <select id="ed-tamanoPapel" onchange="onCambioInputEditor()" class="w-full p-2 border rounded-xl bg-white font-semibold">
+                      <option value="letter">Carta (Letter 8.5×11")</option>
+                      <option value="a4">A4 Internacional</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="flex justify-between font-bold text-slate-700 mb-1"><span>Márgenes PDF</span><span id="ed-val-margen" class="font-mono text-indigo-600">12mm</span></label>
+                    <input id="ed-margenImpresionMm" type="range" min="6" max="20" step="1" oninput="onCambioInputEditor()" class="w-full accent-indigo-600">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- TAB 2: COLORES, TIPOGRAFÍA Y LOGOTIPO -->
+            <div id="ed-panel-colores" class="ed-panel hidden space-y-5">
+              <div class="space-y-2">
+                <label class="block text-[11px] font-black uppercase tracking-wider text-slate-500">Paletas Rápidas</label>
+                <div class="flex flex-wrap gap-1.5">
+                  <button type="button" onclick="aplicarPaletaRapida('#059669','#047857','#ffffff','#0f172a','#f8fafc','#475569','#f8fafc','#e2e8f0')" class="px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center gap-1.5 font-bold"><span class="w-3 h-3 rounded-full bg-emerald-600"></span>Esmeralda</button>
+                  <button type="button" onclick="aplicarPaletaRapida('#0f172a','#0284c7','#0f172a','#ffffff','#0f172a','#f8fafc','#f8fafc','#cbd5e1')" class="px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center gap-1.5 font-bold"><span class="w-3 h-3 rounded-full bg-slate-900"></span>Azul Marino</button>
+                  <button type="button" onclick="aplicarPaletaRapida('#111827','#2563eb','#ffffff','#111827','#ffffff','#374151','#ffffff','#e5e7eb')" class="px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center gap-1.5 font-bold"><span class="w-3 h-3 rounded-full bg-blue-600"></span>Blanco Puro</button>
+                  <button type="button" onclick="aplicarPaletaRapida('#111827','#b48a1e','#111827','#fafaf9','#1c1917','#f3d06b','#faf8f5','#e5dcc5')" class="px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center gap-1.5 font-bold"><span class="w-3 h-3 rounded-full bg-amber-600"></span>Noir Oro</button>
+                  <button type="button" onclick="aplicarPaletaRapida('#881337','#be123c','#881337','#ffffff','#fff1f2','#881337','#fff5f7','#fecdd3')" class="px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center gap-1.5 font-bold"><span class="w-3 h-3 rounded-full bg-rose-800"></span>Borgoña</button>
+                  <button type="button" onclick="aplicarPaletaRapida('#4f46e5','#6366f1','#ffffff','#0f172a','#eef2ff','#312e81','#f8fafc','#e0e7ff')" class="px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center gap-1.5 font-bold"><span class="w-3 h-3 rounded-full bg-indigo-600"></span>Índigo</button>
+                </div>
+              </div>
+
+              <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                <div class="text-[11px] font-black uppercase tracking-wider text-slate-500">Colores Personalizados</div>
+                <div class="grid grid-cols-2 gap-3">
+                  <label class="flex items-center justify-between p-2 bg-white rounded-xl border border-slate-200">
+                    <span class="font-bold text-slate-700">Primario</span>
+                    <input id="ed-colorPrimario" type="color" oninput="onCambioInputEditor()" class="w-8 h-7 rounded cursor-pointer border-0 bg-transparent">
+                  </label>
+                  <label class="flex items-center justify-between p-2 bg-white rounded-xl border border-slate-200">
+                    <span class="font-bold text-slate-700">Acento / Total</span>
+                    <input id="ed-colorAcento" type="color" oninput="onCambioInputEditor()" class="w-8 h-7 rounded cursor-pointer border-0 bg-transparent">
+                  </label>
+                  <label class="flex items-center justify-between p-2 bg-white rounded-xl border border-slate-200">
+                    <span class="font-bold text-slate-700">Fondo Header</span>
+                    <input id="ed-colorFondoHeader" type="color" oninput="onCambioInputEditor()" class="w-8 h-7 rounded cursor-pointer border-0 bg-transparent">
+                  </label>
+                  <label class="flex items-center justify-between p-2 bg-white rounded-xl border border-slate-200">
+                    <span class="font-bold text-slate-700">Texto Header</span>
+                    <input id="ed-colorTextoHeader" type="color" oninput="onCambioInputEditor()" class="w-8 h-7 rounded cursor-pointer border-0 bg-transparent">
+                  </label>
+                  <label class="flex items-center justify-between p-2 bg-white rounded-xl border border-slate-200">
+                    <span class="font-bold text-slate-700">Fondo Tabla</span>
+                    <input id="ed-colorFondoTablaHead" type="color" oninput="onCambioInputEditor()" class="w-8 h-7 rounded cursor-pointer border-0 bg-transparent">
+                  </label>
+                  <label class="flex items-center justify-between p-2 bg-white rounded-xl border border-slate-200">
+                    <span class="font-bold text-slate-700">Texto Tabla</span>
+                    <input id="ed-colorTextoTablaHead" type="color" oninput="onCambioInputEditor()" class="w-8 h-7 rounded cursor-pointer border-0 bg-transparent">
+                  </label>
+                  <label class="flex items-center justify-between p-2 bg-white rounded-xl border border-slate-200">
+                    <span class="font-bold text-slate-700">Fondo Cajas</span>
+                    <input id="ed-colorFondoTarjetas" type="color" oninput="onCambioInputEditor()" class="w-8 h-7 rounded cursor-pointer border-0 bg-transparent">
+                  </label>
+                  <label class="flex items-center justify-between p-2 bg-white rounded-xl border border-slate-200">
+                    <span class="font-bold text-slate-700">Bordes</span>
+                    <input id="ed-colorBorde" type="color" oninput="onCambioInputEditor()" class="w-8 h-7 rounded cursor-pointer border-0 bg-transparent">
+                  </label>
+                </div>
+              </div>
+
+              <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                <div class="text-[11px] font-black uppercase tracking-wider text-slate-500">Tipografía</div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block font-bold text-slate-700 mb-1">Familia de Fuente</label>
+                    <select id="ed-fuente" onchange="onCambioInputEditor()" class="w-full p-2 border rounded-xl bg-white font-semibold">
+                      <option value="jakarta">Plus Jakarta Sans (Moderna)</option>
+                      <option value="inter">Inter (Limpia / Neutral)</option>
+                      <option value="poppins">Poppins (Geométrica)</option>
+                      <option value="playfair">Playfair Display (Editorial)</option>
+                      <option value="merriweather">Merriweather (Clásica Serif)</option>
+                      <option value="mono">JetBrains Mono (Técnica)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="flex justify-between font-bold text-slate-700 mb-1"><span>Tamaño Letra</span><span id="ed-val-tamano" class="font-mono text-indigo-600">12px</span></label>
+                    <input id="ed-tamanoBasePx" type="range" min="10" max="14" step="1" oninput="onCambioInputEditor()" class="w-full accent-indigo-600">
+                  </div>
+                </div>
+              </div>
+
+              <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                <div class="flex items-center justify-between">
+                  <div class="text-[11px] font-black uppercase tracking-wider text-slate-500">Logotipo en Factura</div>
+                  <div class="flex items-center gap-2">
+                    <label class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-[10px] font-bold cursor-pointer">
+                      <i class="fa-solid fa-upload"></i> Subir Logo
+                      <input type="file" accept="image/*" class="hidden" onchange="procesarLogoEditor(event)">
+                    </label>
+                    <button type="button" onclick="quitarLogoEditor()" class="text-[10px] font-bold text-rose-600 hover:underline">Quitar</button>
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="flex justify-between font-bold text-slate-700 mb-1"><span>Alto Logo</span><span id="ed-val-logoAlto" class="font-mono text-indigo-600">54px</span></label>
+                    <input id="ed-logoAltoPx" type="range" min="28" max="110" step="2" oninput="onCambioInputEditor()" class="w-full accent-indigo-600">
+                  </div>
+                  <div>
+                    <label class="flex justify-between font-bold text-slate-700 mb-1"><span>Ancho Máx.</span><span id="ed-val-logoAncho" class="font-mono text-indigo-600">240px</span></label>
+                    <input id="ed-logoAnchoMaxPx" type="range" min="100" max="340" step="10" oninput="onCambioInputEditor()" class="w-full accent-indigo-600">
+                  </div>
+                </div>
+                <label class="flex items-center gap-2 font-semibold text-slate-700 cursor-pointer">
+                  <input id="ed-logoFondoBlanco" type="checkbox" onchange="onCambioInputEditor()" class="rounded accent-indigo-600">
+                  <span>Colocar caja blanca detrás del logotipo (ideal en encabezados oscuros)</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- TAB 3: CAMPOS Y SECCIONES VISIBLES -->
+            <div id="ed-panel-secciones" class="ed-panel hidden space-y-4">
+              <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                <div class="text-[11px] font-black uppercase tracking-wider text-slate-500">Encabezado & Emisor</div>
+                <label class="flex items-center justify-between cursor-pointer py-0.5"><span class="font-semibold text-slate-700">Mostrar Logotipo</span><input id="ed-mostrarLogo" type="checkbox" onchange="onCambioInputEditor()" class="w-4 h-4 accent-indigo-600"></label>
+                <label class="flex items-center justify-between cursor-pointer py-0.5"><span class="font-semibold text-slate-700">Mostrar Razón Social</span><input id="ed-mostrarRazonSocial" type="checkbox" onchange="onCambioInputEditor()" class="w-4 h-4 accent-indigo-600"></label>
+                <label class="flex items-center justify-between cursor-pointer py-0.5"><span class="font-semibold text-slate-700">Mostrar Actividad Económica DGT</span><input id="ed-mostrarActividadEconomica" type="checkbox" onchange="onCambioInputEditor()" class="w-4 h-4 accent-indigo-600"></label>
+                <label class="flex items-center justify-between cursor-pointer py-0.5"><span class="font-semibold text-slate-700">Mostrar Sucursal y Terminal</span><input id="ed-mostrarSucursalTerminal" type="checkbox" onchange="onCambioInputEditor()" class="w-4 h-4 accent-indigo-600"></label>
+                <label class="flex items-center justify-between cursor-pointer py-0.5"><span class="font-semibold text-slate-700">Mostrar Dirección del Emisor</span><input id="ed-mostrarDireccionEmisor" type="checkbox" onchange="onCambioInputEditor()" class="w-4 h-4 accent-indigo-600"></label>
+                <label class="flex items-center justify-between cursor-pointer py-0.5"><span class="font-semibold text-slate-700">Mostrar Teléfono y Correo</span><input id="ed-mostrarTelefonoCorreoEmisor" type="checkbox" onchange="onCambioInputEditor()" class="w-4 h-4 accent-indigo-600"></label>
+              </div>
+
+              <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                <div class="text-[11px] font-black uppercase tracking-wider text-slate-500">Tabla de Detalles & Bloques</div>
+                <label class="flex items-center justify-between cursor-pointer py-0.5"><span class="font-semibold text-slate-700">Bloque "Detalles de Operación"</span><input id="ed-mostrarDetallesOperacion" type="checkbox" onchange="onCambioInputEditor()" class="w-4 h-4 accent-indigo-600"></label>
+                <label class="flex items-center justify-between cursor-pointer py-0.5"><span class="font-semibold text-slate-700">Columna # de Línea</span><input id="ed-mostrarNumeroLinea" type="checkbox" onchange="onCambioInputEditor()" class="w-4 h-4 accent-indigo-600"></label>
+                <label class="flex items-center justify-between cursor-pointer py-0.5"><span class="font-semibold text-slate-700">Código CAByS por artículo</span><input id="ed-mostrarCabys" type="checkbox" onchange="onCambioInputEditor()" class="w-4 h-4 accent-indigo-600"></label>
+                <label class="flex items-center justify-between cursor-pointer py-0.5"><span class="font-semibold text-slate-700">Unidad de medida (Unid / Sp)</span><input id="ed-mostrarUnidadMedida" type="checkbox" onchange="onCambioInputEditor()" class="w-4 h-4 accent-indigo-600"></label>
+                <label class="flex items-center justify-between cursor-pointer py-0.5"><span class="font-semibold text-slate-700">Columna % IVA</span><input id="ed-mostrarColumnaIVA" type="checkbox" onchange="onCambioInputEditor()" class="w-4 h-4 accent-indigo-600"></label>
+              </div>
+
+              <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                <div class="text-[11px] font-black uppercase tracking-wider text-slate-500">Pie, Verificación, Firmas y Marca de Agua</div>
+                <label class="flex items-center justify-between cursor-pointer py-0.5"><span class="font-semibold text-slate-700">Código QR de Verificación DGT</span><input id="ed-mostrarQR" type="checkbox" onchange="onCambioInputEditor()" class="w-4 h-4 accent-indigo-600"></label>
+                <label class="flex items-center justify-between cursor-pointer py-0.5"><span class="font-semibold text-slate-700">Clave Numérica (50 dígitos)</span><input id="ed-mostrarClaveNumerica" type="checkbox" onchange="onCambioInputEditor()" class="w-4 h-4 accent-indigo-600"></label>
+                <label class="flex items-center justify-between cursor-pointer py-0.5"><span class="font-semibold text-slate-700">Líneas de Firma (Recibido Conforme)</span><input id="ed-mostrarFirmaRecibido" type="checkbox" onchange="onCambioInputEditor()" class="w-4 h-4 accent-indigo-600"></label>
+                <label class="flex items-center justify-between cursor-pointer py-0.5"><span class="font-semibold text-slate-700">Resolución Legal DGT al pie</span><input id="ed-mostrarResolucionLegal" type="checkbox" onchange="onCambioInputEditor()" class="w-4 h-4 accent-indigo-600"></label>
+                <label class="flex items-center justify-between cursor-pointer py-0.5"><span class="font-semibold text-slate-700">Marca de Agua diagonal</span><input id="ed-mostrarMarcaAgua" type="checkbox" onchange="onCambioInputEditor()" class="w-4 h-4 accent-indigo-600"></label>
+                <input id="ed-textoMarcaAgua" type="text" placeholder="Texto de marca de agua (ej. ORIGINAL o nombre de empresa)" oninput="onCambioInputEditor()" class="w-full p-2 border rounded-xl bg-white">
+              </div>
+            </div>
+
+            <!-- TAB 4: TEXTOS Y CUENTAS BANCARIAS -->
+            <div id="ed-panel-textos" class="ed-panel hidden space-y-4">
+              <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                <div class="flex items-center justify-between">
+                  <span class="text-[11px] font-black uppercase tracking-wider text-slate-500">Cuentas Bancarias / SINPE Móvil</span>
+                  <button type="button" onclick="insertarEjemploBancosCR()" class="text-[10px] font-bold text-indigo-600 hover:underline">+ Insertar ejemplo CR</button>
+                </div>
+                <input id="ed-tituloCuentasBancarias" type="text" placeholder="Título del bloque (ej. Datos Bancarios / SINPE Móvil)" oninput="onCambioInputEditor()" class="w-full p-2 border rounded-xl bg-white font-semibold">
+                <textarea id="ed-textoCuentasBancarias" rows="3" placeholder="BAC Colones IBAN: CR...&#10;SINPE Móvil: 8888-8888 (Titular)" oninput="onCambioInputEditor()" class="w-full p-2 border rounded-xl bg-white"></textarea>
+              </div>
+
+              <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                <div class="text-[11px] font-black uppercase tracking-wider text-slate-500">Términos y Notas Fijas</div>
+                <textarea id="ed-textoNotasFijas" rows="3" placeholder="Ej. Garantía de 30 días. Pagos a crédito devengan interés moratorio del 2% mensual." oninput="onCambioInputEditor()" class="w-full p-2 border rounded-xl bg-white"></textarea>
+              </div>
+
+              <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                <div class="text-[11px] font-black uppercase tracking-wider text-slate-500">Etiquetas Personalizadas</div>
+                <div>
+                  <label class="block font-bold text-slate-700 mb-1">Título del documento (vacío = título oficial DGT)</label>
+                  <input id="ed-tituloPersonalizado" type="text" placeholder="Automático (Factura Electrónica / Tiquete / NC)" oninput="onCambioInputEditor()" class="w-full p-2 border rounded-xl bg-white">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block font-bold text-slate-700 mb-1">Etiqueta Cliente</label>
+                    <input id="ed-etiquetaCliente" type="text" oninput="onCambioInputEditor()" class="w-full p-2 border rounded-xl bg-white">
+                  </div>
+                  <div>
+                    <label class="block font-bold text-slate-700 mb-1">Etiqueta Total</label>
+                    <input id="ed-etiquetaTotal" type="text" oninput="onCambioInputEditor()" class="w-full p-2 border rounded-xl bg-white">
+                  </div>
+                </div>
+                <div>
+                  <label class="block font-bold text-slate-700 mb-1">Mensaje de Pie de Página</label>
+                  <input id="ed-mensajePie" type="text" oninput="onCambioInputEditor()" class="w-full p-2 border rounded-xl bg-white">
+                </div>
+                <div>
+                  <label class="block font-bold text-slate-700 mb-1">Texto Legal / Resolución DGT</label>
+                  <textarea id="ed-textoResolucionLegal" rows="2" oninput="onCambioInputEditor()" class="w-full p-2 border rounded-xl bg-white text-[11px]"></textarea>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Barra de Acciones Fija Inferior -->
+          <div class="p-3.5 border-t border-slate-200 bg-white flex items-center gap-2 text-xs shrink-0">
+            <button type="button" onclick="restablecerDisenoEditor()" class="px-3 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold transition" title="Restaurar valores de la plantilla seleccionada">
+              <i class="fa-solid fa-rotate-left"></i>
+            </button>
+            <button type="button" onclick="descargarPdfPruebaEditor()" id="ed-btn-pdf" class="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-file-pdf text-rose-400"></i>
+              <span>PDF Prueba</span>
+            </button>
+            <button type="button" onclick="guardarDisenoFactura()" id="ed-btn-guardar" class="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black shadow-md flex items-center justify-center gap-2 transition">
+              <i class="fa-solid fa-floppy-disk"></i>
+              <span>Guardar Diseño</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- PANEL DERECHO: VISTA PREVIA EN TIEMPO REAL -->
+        <div class="flex-1 bg-slate-200/90 flex flex-col overflow-hidden min-w-0">
+          <div class="px-5 py-2.5 bg-white border-b border-slate-200 flex items-center justify-between gap-3 text-xs shrink-0">
+            <div class="flex items-center gap-2.5">
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[11px] border border-emerald-200">
+                <span id="ed-live-dot" class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span>Vista Previa en Vivo</span>
+              </span>
+              <select id="ed-sample-mode" onchange="renderPreviewEditor()" class="p-1.5 border border-slate-200 rounded-lg bg-slate-50 font-semibold text-[11px]">
+                <option value="crc">Ejemplo: Factura CRC (Servicios)</option>
+                <option value="usd">Ejemplo: Factura USD con Descuento</option>
+              </select>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="flex bg-slate-100 rounded-lg p-0.5 text-[11px] font-bold">
+                <button type="button" onclick="cambiarZoomEditor(0.78)" class="ed-zoom-btn px-2 py-1 rounded-md text-slate-600" data-zoom="0.78">78%</button>
+                <button type="button" onclick="cambiarZoomEditor(0.9)" class="ed-zoom-btn px-2 py-1 rounded-md bg-white shadow text-slate-900" data-zoom="0.9">90%</button>
+                <button type="button" onclick="cambiarZoomEditor(1)" class="ed-zoom-btn px-2 py-1 rounded-md text-slate-600" data-zoom="1">100%</button>
+              </div>
+              <button type="button" onclick="imprimirPreviewEditor()" class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px]" title="Imprimir vista previa">
+                <i class="fa-solid fa-print"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="flex-1 overflow-auto p-4 flex justify-center items-start scrollbar-thin">
+            <div id="ed-iframe-wrapper" style="width: 880px; transform: scale(0.9); transform-origin: top center; transition: transform 0.15s ease;">
+              <iframe id="editor-factura-iframe" class="w-full bg-transparent border-0 rounded-2xl" style="height: 1180px;"></iframe>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
     </main>
   </div>
 
@@ -1759,6 +2140,7 @@
 
       const titulos = {
         facturador: 'Nuevo Documento',
+        'editor-factura': 'Editor Visual de Factura',
         pos: 'Punto de Venta',
         historial: 'Comprobantes Emitidos',
         gastos: 'Control de Gastos (Facturas Recibidas)',
@@ -1777,6 +2159,7 @@
       if (moduloId === 'superadmin') cargarSuperAdmin();
 
       if (moduloId === 'facturador') actualizarVistaPreviaFactura();
+      if (moduloId === 'editor-factura') inicializarEditorFactura();
       if (moduloId === 'historial') cargarHistorialComprobantes();
       if (moduloId === 'gastos') cargarGastos();
       if (moduloId === 'inventario') renderTablaInventario();
@@ -2044,7 +2427,7 @@
       estiloFacturaActual = estilo;
 
       document.querySelectorAll('.style-card').forEach(card => {
-        card.className = 'style-card p-3 rounded-xl border border-slate-200 bg-white text-left transition hover:shadow-sm';
+        card.className = 'style-card p-2.5 rounded-xl border border-slate-200 bg-white text-left transition hover:shadow-sm';
         const icon = card.querySelector('.style-check');
         if (icon) icon.classList.add('hidden');
       });
@@ -2052,24 +2435,37 @@
       const activeCard = document.getElementById(`style-card-${estilo}`);
       if (activeCard) {
         const borderMap = {
+          minimalista: 'border-2 border-slate-800 bg-slate-50',
+          'clasico-cr': 'border-2 border-blue-700 bg-blue-50/50',
           ejecutivo: 'border-2 border-emerald-600 bg-emerald-50/50',
           corporativo: 'border-2 border-sky-600 bg-sky-50/50',
+          moderno: 'border-2 border-indigo-600 bg-indigo-50/50',
           noir: 'border-2 border-amber-500 bg-amber-50/40'
         };
-        activeCard.className = `style-card p-3 rounded-xl ${borderMap[estilo] || borderMap.ejecutivo} text-left transition shadow-sm`;
+        activeCard.className = `style-card p-2.5 rounded-xl ${borderMap[estilo] || borderMap.ejecutivo} text-left transition shadow-sm`;
         const icon = activeCard.querySelector('.style-check');
         if (icon) icon.classList.remove('hidden');
       }
 
       const pill = document.getElementById('preview-style-pill');
       if (pill) {
-        const labelMap = { ejecutivo: 'Ejecutivo Esmeralda', corporativo: 'Corporativo Marino', noir: 'Noir & Dorado' };
+        const labelMap = {
+          minimalista: 'Minimalista Limpio',
+          'clasico-cr': 'Clásico CR',
+          ejecutivo: 'Ejecutivo Esmeralda',
+          corporativo: 'Corporativo Marino',
+          moderno: 'Moderno Editorial',
+          noir: 'Noir & Dorado'
+        };
         const classMap = {
+          minimalista: 'px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-900 font-bold text-[10px]',
+          'clasico-cr': 'px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-900 font-bold text-[10px]',
           ejecutivo: 'px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]',
           corporativo: 'px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-900 font-bold text-[10px]',
+          moderno: 'px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-900 font-bold text-[10px]',
           noir: 'px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[10px]'
         };
-        pill.innerText = labelMap[estilo] || 'Ejecutivo';
+        pill.innerText = labelMap[estilo] || 'Personalizado';
         pill.className = classMap[estilo] || classMap.ejecutivo;
       }
 
@@ -4998,6 +5394,438 @@
       cambiarModuloBase(moduloId);
       if (moduloId === 'config') actualizarBadgeCertificado();
     };
+
+    // =========================================================================
+    // EDITOR VISUAL DE FACTURA (DISEÑADOR EN TIEMPO REAL)
+    // =========================================================================
+    let editorPresetsMap = {};
+    let editorDisenoEstado = {};
+    let editorLogoOverride = null; // null = usar logo actual de configActual, string = override temporal
+    let editorPreviewTimer = null;
+
+    const EDITOR_CHECKBOX_KEYS = [
+      'logoFondoBlanco',
+      'mostrarLogo',
+      'mostrarRazonSocial',
+      'mostrarActividadEconomica',
+      'mostrarSucursalTerminal',
+      'mostrarDireccionEmisor',
+      'mostrarTelefonoCorreoEmisor',
+      'mostrarCabys',
+      'mostrarUnidadMedida',
+      'mostrarNumeroLinea',
+      'mostrarColumnaIVA',
+      'mostrarQR',
+      'mostrarClaveNumerica',
+      'mostrarDetallesOperacion',
+      'mostrarResolucionLegal',
+      'mostrarFirmaRecibido',
+      'mostrarMarcaAgua'
+    ];
+
+    const EDITOR_TEXT_KEYS = [
+      'colorPrimario',
+      'colorAcento',
+      'colorFondoHeader',
+      'colorTextoHeader',
+      'colorFondoTablaHead',
+      'colorTextoTablaHead',
+      'colorFondoTarjetas',
+      'colorBorde',
+      'fuente',
+      'tamanoPapel',
+      'textoMarcaAgua',
+      'tituloPersonalizado',
+      'etiquetaCliente',
+      'etiquetaTotal',
+      'tituloCuentasBancarias',
+      'textoCuentasBancarias',
+      'textoNotasFijas',
+      'mensajePie',
+      'textoResolucionLegal'
+    ];
+
+    const EDITOR_NUM_KEYS = [
+      'tamanoBasePx',
+      'radioBordesPx',
+      'grosorFranjaPx',
+      'logoAltoPx',
+      'logoAnchoMaxPx',
+      'margenImpresionMm'
+    ];
+
+    async function inicializarEditorFactura() {
+      try {
+        const res = await fetch('/api/factura/editor-presets');
+        const json = await res.json();
+        if (!json.success) return;
+        editorPresetsMap = json.data.presets || {};
+        editorDisenoEstado = { ...json.data.disenoActual };
+        editorLogoOverride = null;
+        renderPresetsEditorGrid();
+        sincronizarInputsEditor();
+        marcarCambiosEditor(false);
+        renderPreviewEditor();
+      } catch (e) {
+        console.error('Error cargando editor de factura:', e);
+      }
+    }
+
+    function tabEditorFactura(tab) {
+      document.querySelectorAll('.ed-panel').forEach(p => p.classList.add('hidden'));
+      document.querySelectorAll('.ed-tab-btn').forEach(b => {
+        b.classList.remove('bg-white', 'shadow', 'text-slate-900');
+        b.classList.add('text-slate-600');
+      });
+      const panel = document.getElementById(`ed-panel-${tab}`);
+      if (panel) panel.classList.remove('hidden');
+      const btn = document.getElementById(`ed-tab-btn-${tab}`);
+      if (btn) {
+        btn.classList.add('bg-white', 'shadow', 'text-slate-900');
+        btn.classList.remove('text-slate-600');
+      }
+    }
+
+    function renderPresetsEditorGrid() {
+      const grid = document.getElementById('ed-presets-grid');
+      if (!grid) return;
+      const active = editorDisenoEstado.plantillaBase || 'ejecutivo';
+      grid.innerHTML = Object.entries(editorPresetsMap).map(([key, info]) => {
+        const d = info.diseno;
+        const isAct = active === key;
+        return `
+          <button type="button" onclick="aplicarPresetEditor('${key}')" class="p-2.5 rounded-xl border ${isAct ? 'border-2 border-indigo-600 bg-indigo-50/50 shadow-sm' : 'border-slate-200 bg-white hover:border-indigo-300'} text-left transition">
+            <div class="flex items-center justify-between mb-1.5">
+              <div class="flex items-center gap-1">
+                <span class="w-4 h-4 rounded-md border border-slate-200" style="background:${d.colorFondoHeader}"></span>
+                <span class="w-4 h-4 rounded-md" style="background:${d.colorPrimario}"></span>
+                <span class="w-4 h-4 rounded-md" style="background:${d.colorAcento}"></span>
+              </div>
+              ${isAct ? '<i class="fa-solid fa-circle-check text-indigo-600 text-xs"></i>' : ''}
+            </div>
+            <div class="text-[11px] font-black text-slate-900">${escapeHtml(info.nombre)}</div>
+            <div class="text-[10px] text-slate-500 leading-tight mt-0.5">${escapeHtml(info.descripcion)}</div>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function aplicarPresetEditor(key) {
+      const preset = editorPresetsMap[key];
+      if (!preset) return;
+      // Conservar cuentas bancarias, términos fijos y mensaje de pie que el usuario haya escrito
+      const textoBancos = editorDisenoEstado.textoCuentasBancarias || '';
+      const tituloBancos = editorDisenoEstado.tituloCuentasBancarias || preset.diseno.tituloCuentasBancarias;
+      const notasFijas = editorDisenoEstado.textoNotasFijas || '';
+      const pie = editorDisenoEstado.mensajePie || preset.diseno.mensajePie;
+      editorDisenoEstado = {
+        ...preset.diseno,
+        tituloCuentasBancarias: tituloBancos,
+        textoCuentasBancarias: textoBancos,
+        textoNotasFijas: notasFijas,
+        mensajePie: pie
+      };
+      renderPresetsEditorGrid();
+      sincronizarInputsEditor();
+      marcarCambiosEditor(true);
+      programarPreviewEditor();
+    }
+
+    function setCampoEditor(campo, valor) {
+      editorDisenoEstado[campo] = valor;
+      actualizarBotonesEstructuraEditor();
+      marcarCambiosEditor(true);
+      programarPreviewEditor();
+    }
+
+    function aplicarPaletaRapida(prim, acento, hBg, hTxt, tBg, tTxt, cardBg, border) {
+      Object.assign(editorDisenoEstado, {
+        colorPrimario: prim,
+        colorAcento: acento,
+        colorFondoHeader: hBg,
+        colorTextoHeader: hTxt,
+        colorFondoTablaHead: tBg,
+        colorTextoTablaHead: tTxt,
+        colorFondoTarjetas: cardBg,
+        colorBorde: border
+      });
+      sincronizarInputsEditor();
+      marcarCambiosEditor(true);
+      programarPreviewEditor();
+    }
+
+    function actualizarBotonesEstructuraEditor() {
+      document.querySelectorAll('.ed-layout-btn').forEach(btn => {
+        const active = btn.getAttribute('data-ed-layout') === editorDisenoEstado.layoutHeader;
+        btn.className = `ed-layout-btn p-2.5 rounded-xl border text-left transition ${active ? 'border-2 border-indigo-600 bg-indigo-50/60 shadow-sm' : 'border-slate-200 bg-white hover:border-indigo-300'}`;
+      });
+      document.querySelectorAll('.ed-tabla-btn').forEach(btn => {
+        const active = btn.getAttribute('data-ed-tabla') === editorDisenoEstado.estiloTabla;
+        btn.className = `ed-tabla-btn p-2.5 rounded-xl border text-left transition ${active ? 'border-2 border-indigo-600 bg-indigo-50/60 shadow-sm' : 'border-slate-200 bg-white hover:border-indigo-300'}`;
+      });
+    }
+
+    function sincronizarInputsEditor() {
+      const d = editorDisenoEstado;
+      EDITOR_TEXT_KEYS.forEach(k => {
+        const el = document.getElementById(`ed-${k}`);
+        if (el && d[k] !== undefined) el.value = d[k];
+      });
+      EDITOR_NUM_KEYS.forEach(k => {
+        const el = document.getElementById(`ed-${k}`);
+        if (el && d[k] !== undefined) el.value = String(d[k]);
+      });
+      EDITOR_CHECKBOX_KEYS.forEach(k => {
+        const el = document.getElementById(`ed-${k}`);
+        if (el) el.checked = Boolean(d[k]);
+      });
+      actualizarEtiquetasSlidersEditor();
+      actualizarBotonesEstructuraEditor();
+    }
+
+    function actualizarEtiquetasSlidersEditor() {
+      const setTxt = (id, txt) => { const el = document.getElementById(id); if (el) el.innerText = txt; };
+      setTxt('ed-val-radio', `${editorDisenoEstado.radioBordesPx ?? 12}px`);
+      setTxt('ed-val-franja', `${editorDisenoEstado.grosorFranjaPx ?? 0}px`);
+      setTxt('ed-val-margen', `${editorDisenoEstado.margenImpresionMm ?? 12}mm`);
+      setTxt('ed-val-tamano', `${editorDisenoEstado.tamanoBasePx ?? 12}px`);
+      setTxt('ed-val-logoAlto', `${editorDisenoEstado.logoAltoPx ?? 54}px`);
+      setTxt('ed-val-logoAncho', `${editorDisenoEstado.logoAnchoMaxPx ?? 240}px`);
+    }
+
+    function onCambioInputEditor() {
+      EDITOR_TEXT_KEYS.forEach(k => {
+        const el = document.getElementById(`ed-${k}`);
+        if (el) editorDisenoEstado[k] = el.value;
+      });
+      EDITOR_NUM_KEYS.forEach(k => {
+        const el = document.getElementById(`ed-${k}`);
+        if (el) editorDisenoEstado[k] = Number(el.value);
+      });
+      EDITOR_CHECKBOX_KEYS.forEach(k => {
+        const el = document.getElementById(`ed-${k}`);
+        if (el) editorDisenoEstado[k] = Boolean(el.checked);
+      });
+      editorDisenoEstado.mostrarFranjaSuperior = Number(editorDisenoEstado.grosorFranjaPx || 0) > 0;
+      actualizarEtiquetasSlidersEditor();
+      marcarCambiosEditor(true);
+      programarPreviewEditor();
+    }
+
+    function marcarCambiosEditor(tieneCambios) {
+      const badge = document.getElementById('ed-unsaved-badge');
+      if (!badge) return;
+      if (tieneCambios) badge.classList.remove('hidden');
+      else badge.classList.add('hidden');
+    }
+
+    function construirPayloadEjemploEditor() {
+      const mode = document.getElementById('ed-sample-mode')?.value || 'crc';
+      if (mode === 'usd') {
+        return {
+          tipoDocumento: '01',
+          condicionVenta: '02',
+          plazoCredito: '30',
+          mediosPago: ['04'],
+          moneda: 'USD',
+          tipoCambio: Number(configActual?.sitio?.tipoCambioDefault) || 510,
+          estilo: editorDisenoEstado.plantillaBase || 'ejecutivo',
+          diseno: editorDisenoEstado,
+          ocultarBarraAcciones: true,
+          ...(editorLogoOverride !== null ? { logoBase64Override: editorLogoOverride } : {}),
+          notas: 'Favor enviar comprobante de transferencia indicando el número de factura.',
+          receptor: {
+            nombre: 'Inversiones Pacífico Norte S.A.',
+            identificacion: { tipo: '02', numero: '3101845290' },
+            correo: 'cuentasporpagar@pacificonorte.cr',
+            telefono: { codigoPais: '506', numero: '2255-4410' },
+            ubicacion: { senas: 'Escazú, San José, Plaza Corporativa Piso 4' }
+          },
+          items: [
+            { codigoCabys: '8314100000000', detalle: 'Consultoría y Arquitectura Cloud Mensual', cantidad: 1, unidadMedida: 'Sp', precioUnitario: 850, tarifaIVA: 13, montoDescuento: 50, naturalezaDescuento: 'Descuento cliente frecuente' },
+            { codigoCabys: '8314300000000', detalle: 'Soporte Técnico Prioritario 24/7', cantidad: 2, unidadMedida: 'Sp', precioUnitario: 180, tarifaIVA: 13 }
+          ]
+        };
+      }
+      return {
+        tipoDocumento: '01',
+        condicionVenta: '01',
+        mediosPago: ['04'],
+        moneda: 'CRC',
+        estilo: editorDisenoEstado.plantillaBase || 'ejecutivo',
+        diseno: editorDisenoEstado,
+        ocultarBarraAcciones: true,
+        ...(editorLogoOverride !== null ? { logoBase64Override: editorLogoOverride } : {}),
+        notas: 'Gracias por su compra. Documento generado desde el Editor Visual.',
+        receptor: {
+          nombre: 'Comercializadora del Valle Central S.A.',
+          identificacion: { tipo: '02', numero: '3101554821' },
+          correo: 'facturacion@vallecentral.cr',
+          telefono: { codigoPais: '506', numero: '2280-1122' },
+          ubicacion: { senas: 'San Pedro de Montes de Oca, San José' }
+        },
+        items: [
+          { codigoCabys: '8399000000000', detalle: 'Servicios Profesionales de Implementación', cantidad: 1, unidadMedida: 'Sp', precioUnitario: 125000, tarifaIVA: 13 },
+          { codigoCabys: '8313200000000', detalle: 'Licencia Plataforma Digital Anual', cantidad: 2, unidadMedida: 'Unid', precioUnitario: 45000, tarifaIVA: 13 }
+        ]
+      };
+    }
+
+    function programarPreviewEditor() {
+      clearTimeout(editorPreviewTimer);
+      editorPreviewTimer = setTimeout(renderPreviewEditor, 200);
+    }
+
+    async function renderPreviewEditor() {
+      const dot = document.getElementById('ed-live-dot');
+      if (dot) dot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-ping';
+      try {
+        const res = await fetch('/api/factura/preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(construirPayloadEjemploEditor())
+        });
+        const html = await res.text();
+        const iframe = document.getElementById('editor-factura-iframe');
+        if (iframe) {
+          iframe.srcdoc = html;
+          iframe.onload = () => {
+            try {
+              const h = iframe.contentDocument?.documentElement?.scrollHeight;
+              if (h && h > 400) iframe.style.height = `${h + 30}px`;
+            } catch {}
+          };
+        }
+      } catch (e) {
+        console.error('Error en vista previa del editor:', e);
+      } finally {
+        if (dot) dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+      }
+    }
+
+    function cambiarZoomEditor(scale) {
+      const wrap = document.getElementById('ed-iframe-wrapper');
+      if (wrap) wrap.style.transform = `scale(${scale})`;
+      document.querySelectorAll('.ed-zoom-btn').forEach(btn => {
+        const active = Number(btn.getAttribute('data-zoom')) === scale;
+        btn.className = `ed-zoom-btn px-2 py-1 rounded-md ${active ? 'bg-white shadow text-slate-900' : 'text-slate-600'}`;
+      });
+    }
+
+    function imprimirPreviewEditor() {
+      const iframe = document.getElementById('editor-factura-iframe');
+      if (iframe && iframe.contentWindow) iframe.contentWindow.print();
+    }
+
+    function insertarEjemploBancosCR() {
+      const el = document.getElementById('ed-textoCuentasBancarias');
+      if (!el) return;
+      el.value = 'BAC Credomatic Colones (IBAN): CR00010200009000000001\nBAC Credomatic Dólares (IBAN): CR00010200009000000002\nSINPE Móvil: 8888-8888 (A nombre de su empresa)';
+      onCambioInputEditor();
+    }
+
+    function procesarLogoEditor(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        editorLogoOverride = String(reader.result || '');
+        editorDisenoEstado.mostrarLogo = true;
+        const chk = document.getElementById('ed-mostrarLogo');
+        if (chk) chk.checked = true;
+        marcarCambiosEditor(true);
+        renderPreviewEditor();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function quitarLogoEditor() {
+      editorLogoOverride = '';
+      marcarCambiosEditor(true);
+      renderPreviewEditor();
+    }
+
+    function restablecerDisenoEditor() {
+      const key = editorDisenoEstado.plantillaBase || 'ejecutivo';
+      const preset = editorPresetsMap[key];
+      if (!preset) return;
+      if (!confirm(`¿Restablecer todos los colores y opciones a los valores por defecto de "${preset.nombre}"?`)) return;
+      editorDisenoEstado = { ...preset.diseno };
+      sincronizarInputsEditor();
+      marcarCambiosEditor(true);
+      renderPreviewEditor();
+    }
+
+    async function descargarPdfPruebaEditor() {
+      const btn = document.getElementById('ed-btn-pdf');
+      const prevHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Generando...</span>';
+      try {
+        const res = await fetch('/api/factura/preview-pdf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(construirPayloadEjemploEditor())
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          alert(err.error || 'No se pudo generar el PDF de prueba.');
+          return;
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'VistaPrevia_Factura.pdf';
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        alert('Error generando PDF de prueba.');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = prevHtml;
+      }
+    }
+
+    async function guardarDisenoFactura() {
+      const btn = document.getElementById('ed-btn-guardar');
+      const prevHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Guardando...</span>';
+      try {
+        const sitioPatch = {
+          estiloFactura: editorDisenoEstado.plantillaBase || 'ejecutivo',
+          mensajePieTicket: editorDisenoEstado.mensajePie || configActual?.sitio?.mensajePieTicket || '¡Gracias por su preferencia!',
+          disenoFactura: editorDisenoEstado
+        };
+        if (editorLogoOverride !== null) {
+          sitioPatch.logoBase64 = editorLogoOverride;
+        }
+        const res = await fetch('/api/configuracion', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sitio: sitioPatch })
+        });
+        const json = await res.json();
+        if (!json.success) {
+          alert(json.error || 'Error guardando diseño.');
+          return;
+        }
+        configActual = json.data;
+        editorLogoOverride = null;
+        aplicarBrandingAlSitio();
+        estiloFacturaActual = sitioPatch.estiloFactura;
+        seleccionarEstiloFactura(estiloFacturaActual);
+        marcarCambiosEditor(false);
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> <span>¡Diseño Guardado!</span>';
+        setTimeout(() => { btn.innerHTML = prevHtml; }, 1800);
+      } catch (e) {
+        alert('Error de conexión al guardar el diseño.');
+        btn.innerHTML = prevHtml;
+      } finally {
+        btn.disabled = false;
+      }
+    }
 
     verificarSesionYCargarApp();
   </script>
