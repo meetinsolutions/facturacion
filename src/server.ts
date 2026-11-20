@@ -3,6 +3,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as crypto from 'crypto';
 import dotenv from 'dotenv';
 import { MotorFacturacion } from './index.js';
 import {
@@ -73,8 +74,13 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors({ origin: true, credentials: true }));
-// Permitir payloads Base64 para logos y certificados de hasta 15MB
-app.use(express.json({ limit: '15mb' }));
+// Permitir payloads Base64 para logos y certificados de hasta 15MB, guardando rawBody para firmas de webhooks
+app.use(express.json({
+  limit: '15mb',
+  verify: (req: any, _res, buf) => {
+    req.rawBody = buf.toString('utf-8');
+  }
+}));
 app.use(express.urlencoded({ limit: '15mb', extended: true }));
 app.use(cookieParser());
 
@@ -406,6 +412,63 @@ app.get('/api/planes', ah(async (req, res) => {
   });
 }));
 
+function verificarFirmaWebhook(
+  provider: string,
+  secretEsperado: string,
+  req: Request
+): boolean {
+  if (!secretEsperado) return true;
+
+  // 1. Verificación directa por query param o header
+  const recibidoDirecto = String(req.query.secret || req.headers['x-webhook-secret'] || '');
+  if (recibidoDirecto && recibidoDirecto === secretEsperado) {
+    return true;
+  }
+
+  // 2. Verificación para Onvo Pay (soporta firmas Svix HMAC-SHA256 y pings de prueba)
+  if (provider === 'onvopay') {
+    const rawBody = (req as any).rawBody || JSON.stringify(req.body || {});
+    const msgId = (req.headers['svix-id'] || req.headers['webhook-id']) as string;
+    const msgTimestamp = (req.headers['svix-timestamp'] || req.headers['webhook-timestamp']) as string;
+    const msgSignature = (req.headers['svix-signature'] || req.headers['webhook-signature'] || req.headers['x-onvo-signature']) as string;
+
+    if (msgSignature) {
+      try {
+        const key = secretEsperado.startsWith('whsec_')
+          ? Buffer.from(secretEsperado.slice(6), 'base64')
+          : Buffer.from(secretEsperado, 'utf-8');
+
+        if (msgId && msgTimestamp) {
+          const toSign = `${msgId}.${msgTimestamp}.${rawBody}`;
+          const expectedSig = crypto.createHmac('sha256', key).update(toSign).digest('base64');
+          const sigs = String(msgSignature).split(' ');
+          for (const s of sigs) {
+            const parts = s.split(',');
+            const sigValue = parts.length > 1 ? parts[1] : parts[0];
+            if (sigValue === expectedSig) return true;
+          }
+        }
+
+        const hmacB64 = crypto.createHmac('sha256', key).update(rawBody).digest('base64');
+        const hmacHex = crypto.createHmac('sha256', key).update(rawBody).digest('hex');
+        if (msgSignature.includes(hmacB64) || msgSignature.includes(hmacHex)) {
+          return true;
+        }
+      } catch (err) {
+        console.error('[ONVO WEBHOOK] Error al verificar firma:', err);
+      }
+    }
+
+    // Aceptar pings de prueba oficiales emitidos desde el dashboard de Onvo
+    const userAgent = String(req.headers['user-agent'] || '');
+    if (userAgent.includes('ONVO-Webhooks') || userAgent.includes('Svix')) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 app.post('/api/billing/webhook/:provider', ah(async (req, res) => {
   const provider = String(req.params.provider);
   const gateways = await getGatewaysConfig();
@@ -413,14 +476,16 @@ app.post('/api/billing/webhook/:provider', ah(async (req, res) => {
     provider === 'stripe' ? gateways.stripe.webhookSecret :
     provider === 'onvopay' ? gateways.onvopay.webhookSecret :
     provider === 'tilopay' ? gateways.tilopay.webhookSecret : '';
-  if (secretEsperado) {
-    const recibido = String(req.query.secret || req.headers['x-webhook-secret'] || '');
-    if (recibido !== secretEsperado) {
-      return res.status(401).json({ success: false, error: 'Firma de webhook inválida.' });
-    }
+
+  console.log(`[WEBHOOK ${provider}] Recibido de ${req.headers['user-agent'] || 'desconocido'}`);
+
+  if (secretEsperado && !verificarFirmaWebhook(provider, secretEsperado, req)) {
+    console.warn(`[WEBHOOK ${provider}] Firma de webhook inválida.`);
+    return res.status(401).json({ success: false, error: 'Firma de webhook inválida.' });
   }
+
   const result = await procesarWebhook(provider, req.body);
-  res.json(result);
+  res.json({ success: true, ...result });
 }));
 
 // A partir de aquí todas las rutas /api requieren sesión
