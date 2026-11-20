@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sistema POS & Facturación Electrónica</title>
+  <title>MeetinFact · Facturación Electrónica Costa Rica v4.4 | MeetinSolutions</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -24,9 +24,9 @@
   <div id="auth-overlay" class="fixed inset-0 z-[100] bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 flex items-center justify-center p-4">
     <div class="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden">
       <div class="px-8 pt-8 pb-4 text-center">
-        <div class="w-14 h-14 mx-auto rounded-2xl bg-emerald-600 text-white flex items-center justify-center text-2xl shadow-lg"><i class="fa-solid fa-file-invoice-dollar"></i></div>
-        <h1 class="mt-3 text-xl font-black text-slate-800">Facturación Electrónica CR</h1>
-        <p class="text-xs text-slate-500">Plataforma SaaS · Comprobantes v4.4 Hacienda</p>
+        <img src="/logo.png" alt="MeetinSolutions" class="h-14 mx-auto object-contain">
+        <h1 class="mt-3 text-xl font-black text-slate-800">MeetinFact</h1>
+        <p class="text-xs text-slate-500">Plataforma SaaS · MeetinSolutions · Comprobantes v4.4 Hacienda</p>
       </div>
       <div class="flex mx-8 bg-slate-100 rounded-xl p-1 text-xs font-bold">
         <button id="auth-tab-login" onclick="mostrarAuthTab('login')" class="flex-1 py-2 rounded-lg bg-white shadow text-slate-800">Iniciar Sesión</button>
@@ -85,17 +85,17 @@
       <!-- Logotipo & Perfil del Negocio -->
       <div class="p-4 border-b border-slate-800 flex flex-col space-y-2">
         <div id="sidebar-logo-container" class="w-full h-14 rounded-xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-center text-white text-lg font-black shadow-md overflow-hidden p-1.5 transition">
-          <div id="sidebar-logo-icon" class="flex items-center space-x-2 text-emerald-400">
-            <i class="fa-solid fa-store text-xl"></i>
-            <span class="font-black text-sm text-white">SISTEMA POS</span>
+          <div id="sidebar-logo-icon" class="flex items-center space-x-2">
+            <img src="/logo.png" alt="MeetinSolutions" class="h-8 w-auto object-contain">
+            <span class="font-black text-sm text-white">Meetin<span class="text-emerald-400">Fact</span></span>
           </div>
           <img id="sidebar-logo-img" class="w-full h-full object-contain hidden" alt="Logo de la Empresa">
         </div>
         <div class="overflow-hidden flex justify-between items-center px-1">
-          <h2 id="sidebar-app-name" class="font-black text-xs uppercase tracking-wide truncate text-slate-200">SISTEMA POS</h2>
+          <h2 id="sidebar-app-name" class="font-black text-xs uppercase tracking-wide truncate text-slate-200">MEETINFACT</h2>
           <span id="sidebar-app-sub" class="text-[9px] text-emerald-400 font-bold flex items-center space-x-1 shrink-0">
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>DGT v4.3</span>
+            <span>DGT v4.4</span>
           </span>
         </div>
       </div>
@@ -2326,8 +2326,8 @@
       sincronizarTogglesCorreo(Boolean(configActual?.correo?.envioAutomatico));
 
       if (configActual.sitio) {
-        document.getElementById('sidebar-app-name').innerText = configActual.sitio.nombreSistema || 'SISTEMA POS';
-        document.getElementById('sidebar-app-sub').querySelector('span:last-child').innerText = configActual.sitio.subtitulo || 'Costa Rica • DGT v4.3';
+        document.getElementById('sidebar-app-name').innerText = configActual.sitio.nombreSistema || 'MEETINFACT';
+        document.getElementById('sidebar-app-sub').querySelector('span:last-child').innerText = configActual.sitio.subtitulo || 'Costa Rica • DGT v4.4';
         if (configActual.sitio.logoBase64) {
           document.getElementById('sidebar-logo-img').src = configActual.sitio.logoBase64;
           document.getElementById('sidebar-logo-img').classList.remove('hidden');
