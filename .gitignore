@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.p12
+.env
+.env.local
+data/
+certs/
+Llave Criptografica/
+output/
+Pruebas/
