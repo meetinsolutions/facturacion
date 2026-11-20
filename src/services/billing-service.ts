@@ -271,6 +271,25 @@ export async function requireFeatureImap(req: Request, res: Response, next: Next
   }
 }
 
+const ONVO_DIRECT_LINKS: Record<string, { monthly: string; yearly: string }> = {
+  emprendedor: {
+    monthly: 'https://buy.onvopay.com/test_pC5GcXnzWE_dpFkf_sn-TeVb3rc',
+    yearly: 'https://buy.onvopay.com/test_Cr8_67VpCxoK70do1_k_QW1unfc'
+  },
+  pro: {
+    monthly: 'https://buy.onvopay.com/test_6VzVdGxPh2TIawOt39IjUVjZcYA',
+    yearly: 'https://buy.onvopay.com/test_jQyRWv_oM8LPxmu_8ghFWrQ_FXE'
+  },
+  profesional: {
+    monthly: 'https://buy.onvopay.com/test_6VzVdGxPh2TIawOt39IjUVjZcYA',
+    yearly: 'https://buy.onvopay.com/test_jQyRWv_oM8LPxmu_8ghFWrQ_FXE'
+  },
+  empresarial: {
+    monthly: 'https://buy.onvopay.com/test_Fo5VyQvXf4p2KhE0f5yUX7aDhh8',
+    yearly: 'https://buy.onvopay.com/test_UVtR8I-9TQH-zxIYZlrh5B7m1ZM'
+  }
+};
+
 export async function iniciarCheckoutRecurrente(
   tenantId: string,
   planCode: string,
@@ -290,6 +309,26 @@ export async function iniciarCheckoutRecurrente(
   const gateways = await getGatewaysConfig();
   const requested = providerOverride || gateways.pasarelaActiva || 'sandbox';
   let provider = requested;
+
+  // Si se solicita Onvo Pay y existe enlace directo de checkout, utilizarlo inmediatamente
+  const onvoDirectUrl = ONVO_DIRECT_LINKS[plan.code]?.[billingCycle];
+  if ((provider === 'onvopay' || provider === 'sandbox') && onvoDirectUrl && providerOverride === 'onvopay') {
+    const txId = crypto.randomUUID();
+    await pool.query(
+      `INSERT INTO payment_transactions (id, tenant_id, subscription_id, plan_code, billing_cycle, amount_usd, currency, provider, status, provider_reference)
+       VALUES ($1, $2, $3, $4, $5, $6, 'USD', 'onvopay', 'pending', $7)`,
+      [txId, tenantId, subscriptionId, plan.code, billingCycle, amountUsd, onvoDirectUrl]
+    );
+    return {
+      mode: 'redirect',
+      provider: 'onvopay',
+      transactionId: txId,
+      checkoutUrl: onvoDirectUrl,
+      amountUsd,
+      planNombre: plan.nombre,
+      billingCycle
+    };
+  }
 
   if (provider === 'stripe' && !gateways.stripe.secretKey) provider = 'sandbox';
   if (provider === 'onvopay' && !gateways.onvopay.secretKey) provider = 'sandbox';

@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FacturaCR SaaS · Facturación Electrónica Costa Rica v4.4 | MeetinLabs</title>
+  <meta name="description" content="Plataforma SaaS de Facturación Electrónica en Costa Rica homologada ante el Ministerio de Hacienda v4.4. Emisión de comprobantes, editor visual de facturas, buzón IMAP de gastos y pagos con Onvo Pay.">
+  
+  <!-- Tailwind CSS & FontAwesome -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace']
+          },
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              100: '#d1fae5',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+              800: '#065f46',
+              900: '#064e3b',
+              950: '#022c22'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    }
+    .gradient-hero {
+      background: radial-gradient(120% 120% at 50% 10%, #042f2e 0%, #021a18 50%, #030712 100%);
+    }
+    .gradient-card {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+    }
+    .glow-emerald {
+      box-shadow: 0 0 50px -10px rgba(16, 185, 129, 0.35);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 antialiased selection:bg-emerald-500 selection:text-white">
+
+  <!-- ================= NAVBAR ================= -->
+  <header class="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-slate-950/80 border-b border-slate-800/80">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+      
+      <!-- Brand Logo -->
+      <a href="#inicio" class="flex items-center gap-3 group">
+        <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 text-white flex items-center justify-center text-xl shadow-lg shadow-emerald-900/40 group-hover:scale-105 transition">
+          <i class="fa-solid fa-file-invoice-dollar"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-xl font-black tracking-tight text-white">Factura<span class="text-emerald-400">CR</span></span>
+            <span class="text-[10px] uppercase tracking-wider font-extrabold bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30">v4.4 DGT</span>
+          </div>
+          <p class="text-[11px] text-slate-400 font-medium">Por MeetinLabs · Costa Rica</p>
+        </div>
+      </a>
+
+      <!-- Desktop Nav Links -->
+      <nav class="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-300">
+        <a href="#caracteristicas" class="hover:text-emerald-400 transition">Características</a>
+        <a href="#editor" class="hover:text-emerald-400 transition">Editor de Facturas</a>
+        <a href="#como-funciona" class="hover:text-emerald-400 transition">Cómo Funciona</a>
+        <a href="#precios" class="hover:text-emerald-400 transition">Planes y Precios</a>
+        <a href="#faq" class="hover:text-emerald-400 transition">Preguntas Frecuentes</a>
+      </nav>
+
+      <!-- Right CTAs -->
+      <div class="flex items-center gap-3">
+        <a href="/app" class="px-4 py-2 text-sm font-bold text-slate-200 hover:text-white transition">
+          Iniciar Sesión
+        </a>
+        <a href="/app" class="px-5 py-2.5 text-sm font-bold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 rounded-xl shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:-translate-y-0.5 transition active:translate-y-0">
+          Probar Gratis
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= HERO SECTION ================= -->
+  <section id="inicio" class="relative pt-32 pb-20 md:pt-40 md:pb-28 gradient-hero overflow-hidden">
+    <!-- Glow decorative background -->
+    <div class="absolute top-1/4 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-emerald-500/15 blur-[140px] pointer-events-none rounded-full"></div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+      <div class="text-center max-w-3xl mx-auto">
+        
+        <!-- Badge -->
+        <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-bold mb-6">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          Certificado Oficial Ministerio de Hacienda v4.4 · 100% Conforme
+        </div>
+
+        <!-- Main Title -->
+        <h1 class="text-4xl sm:text-6xl font-black text-white tracking-tight leading-[1.15]">
+          Facturación Electrónica en Costa Rica, <span class="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent">Simple y Profesional</span>
+        </h1>
+
+        <!-- Subtitle -->
+        <p class="mt-6 text-lg sm:text-xl text-slate-300 font-normal leading-relaxed">
+          La plataforma en la nube diseñada para profesionales independientes, comercios y empresas. Emite comprobantes con firma criptográfica X.509, personaliza el diseño de tus facturas y automatiza tus gastos por correo.
+        </p>
+
+        <!-- CTA Buttons -->
+        <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+          <a href="#precios" class="w-full sm:w-auto px-8 py-4 rounded-xl text-base font-extrabold bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 shadow-xl shadow-emerald-500/30 hover:scale-[1.02] active:scale-[0.99] transition flex items-center justify-center gap-3">
+            <i class="fa-solid fa-credit-card"></i>
+            <span>Ver Planes y Suscribirme</span>
+          </a>
+          <a href="/app" class="w-full sm:w-auto px-8 py-4 rounded-xl text-base font-bold bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-white hover:text-emerald-300 transition flex items-center justify-center gap-3">
+            <i class="fa-solid fa-rocket"></i>
+            <span>Probar Gratis (15 Comprobantes)</span>
+          </a>
+        </div>
+
+        <!-- Trust Features -->
+        <div class="mt-10 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-semibold text-slate-400 pt-8 border-t border-slate-800/60">
+          <div class="flex items-center justify-center gap-2">
+            <i class="fa-solid fa-shield-halved text-emerald-400 text-sm"></i>
+            <span>Firma Criptográfica .P12</span>
+          </div>
+          <div class="flex items-center justify-center gap-2">
+            <i class="fa-solid fa-qrcode text-emerald-400 text-sm"></i>
+            <span>Código QR Oficial DGT</span>
+          </div>
+          <div class="flex items-center justify-center gap-2">
+            <i class="fa-solid fa-lock text-emerald-400 text-sm"></i>
+            <span>Pago Seguro con Onvo Pay</span>
+          </div>
+          <div class="flex items-center justify-center gap-2">
+            <i class="fa-solid fa-bolt text-emerald-400 text-sm"></i>
+            <span>Validación en 2 Segundos</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hero Visual Showcase -->
+      <div class="mt-14 relative max-w-5xl mx-auto">
+        <div class="relative rounded-3xl p-2 bg-gradient-to-b from-slate-700/50 via-slate-800/40 to-slate-900/70 border border-slate-700/70 shadow-2xl glow-emerald">
+          <div class="overflow-hidden rounded-2xl bg-slate-900">
+            <img src="/hero-preview.jpg" alt="Plataforma SaaS de Facturación Electrónica Costa Rica" class="w-full h-auto object-cover rounded-2xl transform hover:scale-[1.01] transition duration-700">
+          </div>
+
+          <!-- Floating Badge 1 -->
+          <div class="absolute -top-5 -left-4 sm:left-6 bg-slate-900/95 border border-emerald-500/40 rounded-2xl p-3.5 shadow-2xl backdrop-blur-md flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-circle-check"></i>
+            </div>
+            <div>
+              <div class="text-xs font-bold text-white">Comprobante Aprobado</div>
+              <div class="text-[11px] text-emerald-400 font-mono">Clave 50 dígitos Hacienda</div>
+            </div>
+          </div>
+
+          <!-- Floating Badge 2 -->
+          <div class="absolute -bottom-6 -right-4 sm:right-6 bg-slate-900/95 border border-teal-500/40 rounded-2xl p-3.5 shadow-2xl backdrop-blur-md flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-teal-500/20 text-teal-300 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-shield-cat"></i>
+            </div>
+            <div>
+              <div class="text-xs font-bold text-white">Onvo Pay Checkout</div>
+              <div class="text-[11px] text-teal-300">Pagos recurrentes 100% seguros</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ================= STATS / TRUST ================= -->
+  <section class="py-12 bg-slate-900/60 border-y border-slate-800/60">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+        <div>
+          <div class="text-3xl sm:text-4xl font-black text-emerald-400 font-mono">100%</div>
+          <p class="text-xs text-slate-400 font-bold uppercase tracking-wider mt-1">Conforme Hacienda v4.4</p>
+        </div>
+        <div>
+          <div class="text-3xl sm:text-4xl font-black text-teal-400 font-mono">&lt; 2s</div>
+          <p class="text-xs text-slate-400 font-bold uppercase tracking-wider mt-1">Tiempo de Respuesta</p>
+        </div>
+        <div>
+          <div class="text-3xl sm:text-4xl font-black text-cyan-400 font-mono">6 Estilos</div>
+          <p class="text-xs text-slate-400 font-bold uppercase tracking-wider mt-1">Plantillas de Factura</p>
+        </div>
+        <div>
+          <div class="text-3xl sm:text-4xl font-black text-emerald-400 font-mono">24/7</div>
+          <p class="text-xs text-slate-400 font-bold uppercase tracking-wider mt-1">Disponibilidad en la Nube</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= CARACTERÍSTICAS PRINCIPALES ================= -->
+  <section id="caracteristicas" class="py-24 relative">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <div class="text-center max-w-3xl mx-auto mb-16">
+        <span class="text-emerald-400 text-xs font-black uppercase tracking-wider bg-emerald-500/10 px-3.5 py-1.5 rounded-full border border-emerald-500/20">Potencia y Simplicidad</span>
+        <h2 class="text-3xl sm:text-4xl font-black text-white mt-4 tracking-tight">Todo lo que necesitas para tu facturación en Costa Rica</h2>
+        <p class="text-slate-400 text-base mt-3">Diseñado desde cero para adaptarse a las exigencias fiscales de la Dirección General de Tributación.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        
+        <!-- Feature 1 -->
+        <div class="p-8 rounded-3xl bg-slate-900/60 border border-slate-800 hover:border-emerald-500/40 hover:-translate-y-1 transition duration-300 group">
+          <div class="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-2xl mb-6 group-hover:bg-emerald-500 group-hover:text-slate-950 transition">
+            <i class="fa-solid fa-file-invoice"></i>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-2">Comprobantes v4.4 Completos</h3>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            Emisión legal de Factura Electrónica (01), Tiquete (04), Notas de Crédito (03), Notas de Débito (02), Facturas de Exportación (08) y Facturas de Compra (09).
+          </p>
+        </div>
+
+        <!-- Feature 2 -->
+        <div class="p-8 rounded-3xl bg-slate-900/60 border border-slate-800 hover:border-emerald-500/40 hover:-translate-y-1 transition duration-300 group">
+          <div class="w-14 h-14 rounded-2xl bg-teal-500/10 text-teal-400 flex items-center justify-center text-2xl mb-6 group-hover:bg-teal-400 group-hover:text-slate-950 transition">
+            <i class="fa-solid fa-palette"></i>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-2">Editor Visual de Factura</h3>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            Personaliza en tiempo real el diseño de tus facturas. Elige entre 6 estilos (Minimalista, Clásico, Ejecutivo, Corporativo, Moderno, Noir), paletas de colores, logos y firmas.
+          </p>
+        </div>
+
+        <!-- Feature 3 -->
+        <div class="p-8 rounded-3xl bg-slate-900/60 border border-slate-800 hover:border-emerald-500/40 hover:-translate-y-1 transition duration-300 group">
+          <div class="w-14 h-14 rounded-2xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center text-2xl mb-6 group-hover:bg-cyan-400 group-hover:text-slate-950 transition">
+            <i class="fa-solid fa-envelope-open-text"></i>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-2">Recepción Automática (IMAP)</h3>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            Conecta tu buzón de correo. El sistema extrae los XML de gastos recibidos de tus proveedores y genera los mensajes de aceptación ante Hacienda en un solo clic.
+          </p>
+        </div>
+
+        <!-- Feature 4 -->
+        <div class="p-8 rounded-3xl bg-slate-900/60 border border-slate-800 hover:border-emerald-500/40 hover:-translate-y-1 transition duration-300 group">
+          <div class="w-14 h-14 rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center text-2xl mb-6 group-hover:bg-blue-400 group-hover:text-slate-950 transition">
+            <i class="fa-solid fa-id-card"></i>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-2">Consulta de Cédulas Hacienda</h3>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            Olvídate de teclear razones sociales. Al ingresar la cédula física o jurídica del cliente, el sistema autocompleta el nombre oficial registrado en Tributación.
+          </p>
+        </div>
+
+        <!-- Feature 5 -->
+        <div class="p-8 rounded-3xl bg-slate-900/60 border border-slate-800 hover:border-emerald-500/40 hover:-translate-y-1 transition duration-300 group">
+          <div class="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-2xl mb-6 group-hover:bg-emerald-500 group-hover:text-slate-950 transition">
+            <i class="fa-solid fa-building-columns"></i>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-2">SINPE Móvil & Cuentas IBAN</h3>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            Inserta tus datos bancarios y número de SINPE Móvil directamente al pie de la factura para que tus clientes te transfieran de forma rápida y sin errores.
+          </p>
+        </div>
+
+        <!-- Feature 6 -->
+        <div class="p-8 rounded-3xl bg-slate-900/60 border border-slate-800 hover:border-emerald-500/40 hover:-translate-y-1 transition duration-300 group">
+          <div class="w-14 h-14 rounded-2xl bg-purple-500/10 text-purple-400 flex items-center justify-center text-2xl mb-6 group-hover:bg-purple-400 group-hover:text-slate-950 transition">
+            <i class="fa-solid fa-chart-pie"></i>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-2">Reporte de IVA y D-104</h3>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            Reportes detallados de ventas gravadas, exentas, IVA cobrado e IVA soportado en gastos. Exportación a Excel lista para tu contador o declaración mensual.
+          </p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= INVOICE EDITOR SHOWCASE ================= -->
+  <section id="editor" class="py-24 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 border-t border-slate-800/80">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+        
+        <!-- Info Left -->
+        <div>
+          <span class="text-teal-400 text-xs font-black uppercase tracking-wider bg-teal-500/10 px-3.5 py-1.5 rounded-full border border-teal-500/20">Tu Marca, Tu Estilo</span>
+          <h2 class="text-3xl sm:text-4xl font-black text-white mt-4 tracking-tight leading-tight">
+            Crea facturas que reflejen la identidad de tu empresa
+          </h2>
+          <p class="text-slate-300 text-base mt-4 leading-relaxed">
+            No te conformes con facturas genéricas y aburridas. Con nuestro potente <strong>Editor Visual</strong>, configuras colores corporativos, tipografías ejecutivas, encabezados organizados y códigos QR de Hacienda de alta definición.
+          </p>
+
+          <div class="mt-8 space-y-4">
+            <div class="flex items-start gap-4">
+              <div class="w-8 h-8 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-sm font-bold flex-shrink-0 mt-0.5">
+                <i class="fa-solid fa-check"></i>
+              </div>
+              <div>
+                <h4 class="text-white font-bold text-sm">6 Estilos Preconfigurados</h4>
+                <p class="text-slate-400 text-xs mt-0.5">Minimalista, Clásico Costarricense, Ejecutivo, Corporativo, Moderno y Noir.</p>
+              </div>
+            </div>
+
+            <div class="flex items-start gap-4">
+              <div class="w-8 h-8 rounded-xl bg-teal-500/15 text-teal-400 flex items-center justify-center text-sm font-bold flex-shrink-0 mt-0.5">
+                <i class="fa-solid fa-check"></i>
+              </div>
+              <div>
+                <h4 class="text-white font-bold text-sm">Paletas de Colores & Geometría</h4>
+                <p class="text-slate-400 text-xs mt-0.5">Ajusta bordes redondeados, colores de énfasis, fuentes serif/sans y tamaños de papel Carta o A4.</p>
+              </div>
+            </div>
+
+            <div class="flex items-start gap-4">
+              <div class="w-8 h-8 rounded-xl bg-cyan-500/15 text-cyan-400 flex items-center justify-center text-sm font-bold flex-shrink-0 mt-0.5">
+                <i class="fa-solid fa-check"></i>
+              </div>
+              <div>
+                <h4 class="text-white font-bold text-sm">Previsualización en Vivo & Descarga PDF</h4>
+                <p class="text-slate-400 text-xs mt-0.5">Observa los cambios al instante en un lienzo interactivo y genera PDFs listos para imprimir o enviar.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-8">
+            <a href="/app" class="inline-flex items-center gap-2 text-emerald-400 hover:text-emerald-300 font-extrabold text-sm group">
+              <span>Probar el Editor en vivo</span>
+              <i class="fa-solid fa-arrow-right group-hover:translate-x-1 transition"></i>
+            </a>
+          </div>
+        </div>
+
+        <!-- Visual Mockup Right -->
+        <div class="relative">
+          <div class="relative rounded-3xl p-6 bg-slate-900 border border-slate-700/80 shadow-2xl overflow-hidden">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-4 mb-4 text-xs text-slate-400 font-bold">
+              <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-rose-500"></span>
+                <span class="w-3 h-3 rounded-full bg-amber-500"></span>
+                <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+                <span class="ml-2 text-slate-300">Editor de Facturas · Vista Previa</span>
+              </div>
+              <span class="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded font-mono">PDF Letter</span>
+            </div>
+
+            <!-- Mini Invoice Mock -->
+            <div class="bg-white text-slate-900 rounded-xl p-6 shadow-inner text-xs font-sans">
+              <div class="flex justify-between items-start border-b border-slate-200 pb-4">
+                <div>
+                  <div class="text-base font-black text-slate-900">MI EMPRESA S.A.</div>
+                  <div class="text-[10px] text-slate-500">Cédula Jurídica: 3-101-123456</div>
+                  <div class="text-[10px] text-slate-500">San José, Costa Rica · Tel: 2222-0000</div>
+                </div>
+                <div class="text-right">
+                  <div class="text-xs font-black text-emerald-700 uppercase tracking-wider">Factura Electrónica</div>
+                  <div class="text-[11px] font-mono font-bold text-slate-800">No. 00100001010000001234</div>
+                  <div class="text-[10px] text-slate-400 mt-1">Fecha: 20/11/2026</div>
+                </div>
+              </div>
+
+              <!-- Table sample -->
+              <div class="mt-4">
+                <table class="w-full text-left text-[11px]">
+                  <thead>
+                    <tr class="bg-slate-100 text-slate-700 font-bold">
+                      <th class="py-1.5 px-2 rounded-l">Cant.</th>
+                      <th class="py-1.5 px-2">Descripción</th>
+                      <th class="py-1.5 px-2">Precio</th>
+                      <th class="py-1.5 px-2 rounded-r text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-100 text-slate-700">
+                    <tr>
+                      <td class="py-1 px-2 font-mono">1.00</td>
+                      <td class="py-1 px-2 font-medium">Servicios Profesionales de Consultoría TI</td>
+                      <td class="py-1 px-2 font-mono">₡150,000.00</td>
+                      <td class="py-1 px-2 font-mono text-right font-bold">₡150,000.00</td>
+                    </tr>
+                    <tr>
+                      <td class="py-1 px-2 font-mono">1.00</td>
+                      <td class="py-1 px-2 font-medium">Mantenimiento y Soporte en la Nube</td>
+                      <td class="py-1 px-2 font-mono">₡45,000.00</td>
+                      <td class="py-1 px-2 font-mono text-right font-bold">₡45,000.00</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Totals & Sinpe -->
+              <div class="mt-4 pt-3 border-t border-slate-200 flex justify-between items-end">
+                <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-[10px]">
+                  <span class="font-bold text-emerald-800">SINPE Móvil:</span> 6045-0476<br>
+                  <span class="text-slate-600">Titular: Mi Empresa S.A.</span>
+                </div>
+                <div class="text-right text-[11px] space-y-0.5">
+                  <div class="text-slate-600">Subtotal: <span class="font-mono">₡195,000.00</span></div>
+                  <div class="text-slate-600">IVA (13%): <span class="font-mono">₡25,350.00</span></div>
+                  <div class="text-sm font-black text-slate-900 border-t border-slate-300 pt-1">Total: <span class="font-mono text-emerald-700">₡220,350.00</span></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Overlay Badge -->
+            <div class="absolute bottom-4 right-4 bg-emerald-600 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-lg flex items-center gap-2">
+              <i class="fa-solid fa-wand-magic-sparkles"></i>
+              <span>Totalmente Personalizable</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ================= CÓMO FUNCIONA ================= -->
+  <section id="como-funciona" class="py-24">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <div class="text-center max-w-3xl mx-auto mb-16">
+        <span class="text-emerald-400 text-xs font-black uppercase tracking-wider bg-emerald-500/10 px-3.5 py-1.5 rounded-full border border-emerald-500/20">Proceso Rápido</span>
+        <h2 class="text-3xl sm:text-4xl font-black text-white mt-4 tracking-tight">Comienza a facturar en 3 simples pasos</h2>
+        <p class="text-slate-400 text-base mt-3">Sin contratos forzosos ni configuraciones complejas.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
+        
+        <!-- Step 1 -->
+        <div class="p-8 rounded-3xl bg-slate-900/40 border border-slate-800 relative">
+          <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-400 font-black text-xl flex items-center justify-center mb-6 border border-emerald-500/30">
+            1
+          </div>
+          <h3 class="text-lg font-bold text-white mb-2">Elige tu Plan y Paga con Onvo Pay</h3>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            Selecciona el plan que se adapte a tu volumen de facturas. Realiza el pago seguro y tu suscripción quedará activa de inmediato.
+          </p>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="p-8 rounded-3xl bg-slate-900/40 border border-slate-800 relative">
+          <div class="w-12 h-12 rounded-2xl bg-teal-500/10 text-teal-400 font-black text-xl flex items-center justify-center mb-6 border border-teal-500/30">
+            2
+          </div>
+          <h3 class="text-lg font-bold text-white mb-2">Carga tu Llave Criptográfica</h3>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            Sube tu certificado oficial de Hacienda (.p12) y tus credenciales de ATV (o prueba primero en el entorno de pruebas de Hacienda).
+          </p>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="p-8 rounded-3xl bg-slate-900/40 border border-slate-800 relative">
+          <div class="w-12 h-12 rounded-2xl bg-cyan-500/10 text-cyan-400 font-black text-xl flex items-center justify-center mb-6 border border-cyan-500/30">
+            3
+          </div>
+          <h3 class="text-lg font-bold text-white mb-2">¡Emite y Envía Facturas!</h3>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            Genera comprobantes, envíalos automáticamente por correo electrónico a tus clientes con PDF y XML firmado y consulta el estado de aprobación.
+          </p>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ================= PRECIOS & ONVO PAY ================= -->
+  <section id="precios" class="py-24 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 border-t border-slate-800/80">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <div class="text-center max-w-3xl mx-auto mb-12">
+        <span class="text-emerald-400 text-xs font-black uppercase tracking-wider bg-emerald-500/10 px-3.5 py-1.5 rounded-full border border-emerald-500/20">Planes Transparentes</span>
+        <h2 class="text-3xl sm:text-5xl font-black text-white mt-4 tracking-tight">
+          Precios diseñados para crecer contigo
+        </h2>
+        <p class="text-slate-400 text-base mt-4">
+          Sin costos ocultos ni letras pequeñas. Paga de forma segura mediante <strong>Onvo Pay</strong> con tarjeta de crédito o débito.
+        </p>
+
+        <!-- Billing Period Toggle -->
+        <div class="mt-8 inline-flex items-center p-1.5 rounded-2xl bg-slate-900 border border-slate-700/80 shadow-lg">
+          <button id="btn-toggle-monthly" onclick="setBillingCycle('monthly')" class="px-6 py-2.5 rounded-xl text-xs font-black transition bg-emerald-500 text-slate-950 shadow-md">
+            Facturación Mensual
+          </button>
+          <button id="btn-toggle-yearly" onclick="setBillingCycle('yearly')" class="px-6 py-2.5 rounded-xl text-xs font-black transition text-slate-400 hover:text-white flex items-center gap-2">
+            <span>Facturación Anual</span>
+            <span class="bg-emerald-500/20 text-emerald-300 text-[10px] px-2 py-0.5 rounded-full font-extrabold border border-emerald-500/30">Ahorra hasta 2 meses</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Pricing Cards Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
+        
+        <!-- ================= CARD 1: GRATUITO ================= -->
+        <div class="rounded-3xl bg-slate-900/60 border border-slate-800 p-7 flex flex-col justify-between hover:border-slate-700 transition">
+          <div>
+            <div class="text-slate-400 text-xs font-black uppercase tracking-wider">Plan Inicial</div>
+            <h3 class="text-2xl font-black text-white mt-1">Gratuito</h3>
+            <p class="text-slate-400 text-xs mt-2 min-h-[36px]">Ideal para comenzar y probar la plataforma sin compromiso.</p>
+
+            <div class="my-6">
+              <div class="flex items-baseline">
+                <span class="text-4xl font-black text-white font-mono">$0</span>
+                <span class="text-slate-400 text-xs ml-2">/ gratis</span>
+              </div>
+              <div class="text-[11px] text-emerald-400 font-bold mt-1">Para siempre · Sin tarjeta</div>
+            </div>
+
+            <ul class="space-y-3 text-xs text-slate-300 border-t border-slate-800/80 pt-6">
+              <li class="flex items-center gap-2.5">
+                <i class="fa-solid fa-check text-emerald-400 text-sm"></i>
+                <span><strong>15 comprobantes</strong> / mes</span>
+              </li>
+              <li class="flex items-center gap-2.5">
+                <i class="fa-solid fa-check text-emerald-400 text-sm"></i>
+                <span>1 usuario</span>
+              </li>
+              <li class="flex items-center gap-2.5">
+                <i class="fa-solid fa-check text-emerald-400 text-sm"></i>
+                <span>Facturas y Tiquetes Electrónicos</span>
+              </li>
+              <li class="flex items-center gap-2.5">
+                <i class="fa-solid fa-check text-emerald-400 text-sm"></i>
+                <span>Firma digital .p12 oficial</span>
+              </li>
+              <li class="flex items-center gap-2.5 text-slate-500">
+                <i class="fa-solid fa-xmark text-slate-600 text-sm"></i>
+                <span>Recepción de gastos IMAP</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="mt-8">
+            <a href="/app" class="w-full py-3.5 px-4 rounded-xl text-center font-bold text-xs bg-slate-800 hover:bg-slate-700 text-white block transition">
+              Comenzar Gratis
+            </a>
+          </div>
+        </div>
+
+        <!-- ================= CARD 2: EMPRENDEDOR ================= -->
+        <div class="rounded-3xl bg-slate-900/70 border border-slate-800 p-7 flex flex-col justify-between hover:border-emerald-500/40 transition">
+          <div>
+            <div class="text-teal-400 text-xs font-black uppercase tracking-wider">Pymes & Emprendedores</div>
+            <h3 class="text-2xl font-black text-white mt-1">Emprendedor</h3>
+            <p class="text-slate-400 text-xs mt-2 min-h-[36px]">Para negocios en crecimiento que requieren catálogo y envíos automáticos.</p>
+
+            <div class="my-6">
+              <div class="flex items-baseline">
+                <span id="price-emprendedor" class="text-4xl font-black text-white font-mono">$15</span>
+                <span id="cycle-emprendedor" class="text-slate-400 text-xs ml-2">/ mes</span>
+              </div>
+              <div id="save-emprendedor" class="text-[11px] text-teal-400 font-bold mt-1">Cobro mensual flexible</div>
+            </div>
+
+            <ul class="space-y-3 text-xs text-slate-300 border-t border-slate-800/80 pt-6">
+              <li class="flex items-center gap-2.5">
+                <i class="fa-solid fa-check text-emerald-400 text-sm"></i>
+                <span><strong>Hasta 100 comprobantes</strong> / mes</span>
+              </li>
+              <li class="flex items-center gap-2.5">
+                <i class="fa-solid fa-check text-emerald-400 text-sm"></i>
+                <span>2 usuarios simultáneos</span>
+              </li>
+              <li class="flex items-center gap-2.5">
+                <i class="fa-solid fa-check text-emerald-400 text-sm"></i>
+                <span>Catálogo de productos y clientes</span>
+              </li>
+              <li class="flex items-center gap-2.5">
+                <i class="fa-solid fa-check text-emerald-400 text-sm"></i>
+                <span>Envío automático por correo (PDF+XML)</span>
+              </li>
+              <li class="flex items-center gap-2.5">
+                <i class="fa-solid fa-check text-emerald-400 text-sm"></i>
+                <span>Editor de factura con logo y colores</span>
+              </li>
+              <li class="flex items-center gap-2.5">
+                <i class="fa-solid fa-check text-emerald-400 text-sm"></i>
+                <span>Bloque bancario y SINPE Móvil</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="mt-8">
+            <a id="link-emprendedor" href="https://buy.onvopay.com/test_pC5GcXnzWE_dpFkf_sn-TeVb3rc" target="_blank" rel="noopener noreferrer" class="w-full py-3.5 px-4 rounded-xl text-center font-bold text-xs bg-slate-800 hover:bg-emerald-600 text-white block transition border border-slate-700/80 flex items-center justify-center gap-2">
+              <i class="fa-solid fa-credit-card"></i>
+              <span>Pagar con Onvo Pay</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- ================= CARD 3: PROFESIONAL (DESTACADO) ================= -->
+        <div class="rounded-3xl bg-gradient-to-b from-slate-900 via-slate-900 to-emerald-950/40 border-2 border-emerald-500 p-7 flex flex-col justify-between relative shadow-2xl shadow-emerald-950/50">
+          <!-- Featured Badge -->
+          <div class="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 text-[10px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full shadow-lg">
+            ⭐ Más Popular
+          </div>
+
+          <div>
+            <div class="text-emerald-400 text-xs font-black uppercase tracking-wider">Ilimitado & Automatizado</div>
+            <h3 class="text-2xl font-black text-white mt-1">Profesional</h3>
+            <p class="text-slate-300 text-xs mt-2 min-h-[36px]">Comprobantes ilimitados y control total de gastos IMAP para profesionales y comercios.</p>
+
+            <div class="my-6">
+              <div class="flex items-baseline">
+                <span id="price-profesional" class="text-4xl font-black text-white font-mono">$35</span>
+                <span id="cycle-profesional" class="text-slate-400 text-xs ml-2">/ mes</span>
+              </div>
+              <div id="save-profesional" class="text-[11px] text-emerald-400 font-bold mt-1">Comprobantes 100% ilimitados</div>
+            </div>
+
+            <ul class="space-y-3 text-xs text-slate-200 border-t border-slate-700/80 pt-6">
+              <li class="flex items-center gap-2.5 font-bold text-emerald-300">
+                <i class="fa-solid fa-infinity text-emerald-400 text-sm"></i>
+                <span>Comprobantes ILIMITADOS</span>
+              </li>
+              <li class="flex items-center gap-2.5">
+                <i class="fa-solid fa-check text-emerald-400 text-sm"></i>
+                <span>Hasta 5 usuarios con roles</span>
+              </li>
+              <li class="flex items-center gap-2.5 font-semibold text-white">
+                <i class="fa-solid fa-check text-emerald-400 text-sm"></i>
+                <span>Buzón IMAP de gastos automático</span>
+              </li>
+              <li class="flex items-center gap-2.5">
+                <i class="fa-solid fa-check text-emerald-400 text-sm"></i>
+                <span>Editor avanzado (6 estilos, marcas, firmas)</span>
+              </li>
+              <li class="flex items-center gap-2.5">
+                <i class="fa-solid fa-check text-emerald-400 text-sm"></i>
+                <span>Consulta automática de cédulas</span>
+              </li>
+              <li class="flex items-center gap-2.5">
+                <i class="fa-solid fa-check text-emerald-400 text-sm"></i>
+                <span>Reportes de IVA y resumen D-104</span>
+              </li>
+              <li class="flex items-center gap-2.5">
+                <i class="fa-solid fa-check text-emerald-400 text-sm"></i>
+                <span>Soporte prioritario</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="mt-8">
+            <a id="link-profesional" href="https://buy.onvopay.com/test_6VzVdGxPh2TIawOt39IjUVjZcYA" target="_blank" rel="noopener noreferrer" class="w-full py-4 px-4 rounded-xl text-center font-black text-xs bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 block shadow-lg shadow-emerald-500/30 hover:scale-[1.02] active:scale-[0.99] transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-bolt"></i>
+              <span>Suscribirme con Onvo Pay</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- ================= CARD 4: EMPRESARIAL ================= -->
+        <div class="rounded-3xl bg-slate-900/70 border border-slate-800 p-7 flex flex-col justify-between hover:border-cyan-500/40 transition">
+          <div>
+            <div class="text-cyan-400 text-xs font-black uppercase tracking-wider">Grandes Operaciones</div>
+            <h3 class="text-2xl font-black text-white mt-1">Empresarial</h3>
+            <p class="text-slate-400 text-xs mt-2 min-h-[36px]">Máxima escala, sucursales múltiples y todas las automatizaciones fiscales avanzadas.</p>
+
+            <div class="my-6">
+              <div class="flex items-baseline">
+                <span id="price-empresarial" class="text-4xl font-black text-white font-mono">$75</span>
+                <span id="cycle-empresarial" class="text-slate-400 text-xs ml-2">/ mes</span>
+              </div>
+              <div id="save-empresarial" class="text-[11px] text-cyan-400 font-bold mt-1">Multi-sucursal & Soporte VIP</div>
+            </div>
+
+            <ul class="space-y-3 text-xs text-slate-300 border-t border-slate-800/80 pt-6">
+              <li class="flex items-center gap-2.5 font-bold text-cyan-300">
+                <i class="fa-solid fa-infinity text-cyan-400 text-sm"></i>
+                <span>Comprobantes ILIMITADOS</span>
+              </li>
+              <li class="flex items-center gap-2.5">
+                <i class="fa-solid fa-check text-cyan-400 text-sm"></i>
+                <span>Hasta 20 usuarios y terminales</span>
+              </li>
+              <li class="flex items-center gap-2.5">
+                <i class="fa-solid fa-check text-cyan-400 text-sm"></i>
+                <span>Todo lo del Plan Profesional</span>
+              </li>
+              <li class="flex items-center gap-2.5">
+                <i class="fa-solid fa-check text-cyan-400 text-sm"></i>
+                <span>Exportación (08) y Compra (09)</span>
+              </li>
+              <li class="flex items-center gap-2.5">
+                <i class="fa-solid fa-check text-cyan-400 text-sm"></i>
+                <span>Exportación contable Excel masiva</span>
+              </li>
+              <li class="flex items-center gap-2.5">
+                <i class="fa-solid fa-check text-cyan-400 text-sm"></i>
+                <span>Onboarding dedicado y soporte 24/7</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="mt-8">
+            <a id="link-empresarial" href="https://buy.onvopay.com/test_Fo5VyQvXf4p2KhE0f5yUX7aDhh8" target="_blank" rel="noopener noreferrer" class="w-full py-3.5 px-4 rounded-xl text-center font-bold text-xs bg-slate-800 hover:bg-cyan-600 text-white block transition border border-slate-700/80 flex items-center justify-center gap-2">
+              <i class="fa-solid fa-credit-card"></i>
+              <span>Pagar con Onvo Pay</span>
+            </a>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Guarantee & Onvo Payment Security Notice -->
+      <div class="mt-16 bg-slate-900/90 border border-slate-800 rounded-3xl p-8 max-w-4xl mx-auto flex flex-col md:flex-row items-center gap-6 text-center md:text-left">
+        <div class="w-16 h-16 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-3xl flex-shrink-0 border border-emerald-500/20">
+          <i class="fa-solid fa-lock"></i>
+        </div>
+        <div class="flex-1">
+          <h4 class="text-lg font-bold text-white flex items-center justify-center md:justify-start gap-2">
+            <span>Pagos 100% Seguros Procesados por Onvo Pay</span>
+            <span class="text-xs bg-emerald-500/20 text-emerald-300 font-extrabold px-2 py-0.5 rounded border border-emerald-500/30">PCI-DSS L1</span>
+          </h4>
+          <p class="text-xs text-slate-400 mt-1">
+            Tus datos de tarjeta viajan encriptados de extremo a extremo. Aceptamos tarjetas de crédito y débito locales e internacionales (Visa, Mastercard, American Express). Puedes cancelar o cambiar tu suscripción en cualquier momento.
+          </p>
+        </div>
+        <div class="flex items-center gap-3 text-2xl text-slate-500">
+          <i class="fa-brands fa-cc-visa hover:text-white transition"></i>
+          <i class="fa-brands fa-cc-mastercard hover:text-white transition"></i>
+          <i class="fa-brands fa-cc-amex hover:text-white transition"></i>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ================= TESTIMONIOS ================= -->
+  <section class="py-24">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <div class="text-center max-w-3xl mx-auto mb-16">
+        <span class="text-teal-400 text-xs font-black uppercase tracking-wider bg-teal-500/10 px-3.5 py-1.5 rounded-full border border-teal-500/20">Casos de Éxito</span>
+        <h2 class="text-3xl sm:text-4xl font-black text-white mt-4 tracking-tight">Lo que opinan nuestros clientes en Costa Rica</h2>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        
+        <div class="p-8 rounded-3xl bg-slate-900/40 border border-slate-800 flex flex-col justify-between">
+          <div>
+            <div class="flex text-amber-400 text-xs gap-1 mb-4">
+              <i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i>
+            </div>
+            <p class="text-slate-300 text-sm leading-relaxed italic">
+              "El editor visual de facturas es una maravilla. Antes enviaba un PDF genérico feo; ahora mis clientes reciben un documento elegante con mi logo, mis colores y mi SINPE Móvil clarísimo."
+            </p>
+          </div>
+          <div class="mt-6 flex items-center gap-3 pt-4 border-t border-slate-800">
+            <div class="w-10 h-10 rounded-full bg-emerald-600 font-bold text-white flex items-center justify-center text-sm">CR</div>
+            <div>
+              <div class="text-xs font-bold text-white">Carlos Rodríguez M.</div>
+              <div class="text-[11px] text-slate-400">Consultor TI · San José</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-8 rounded-3xl bg-slate-900/40 border border-slate-800 flex flex-col justify-between">
+          <div>
+            <div class="flex text-amber-400 text-xs gap-1 mb-4">
+              <i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i>
+            </div>
+            <p class="text-slate-300 text-sm leading-relaxed italic">
+              "La recepción automática de gastos por IMAP me ahorra al menos 5 horas cada fin de mes. El sistema descarga los XML de mis proveedores y los aprueba en Hacienda en segundos."
+            </p>
+          </div>
+          <div class="mt-6 flex items-center gap-3 pt-4 border-t border-slate-800">
+            <div class="w-10 h-10 rounded-full bg-teal-600 font-bold text-white flex items-center justify-center text-sm">MV</div>
+            <div>
+              <div class="text-xs font-bold text-white">María José Vargas</div>
+              <div class="text-[11px] text-slate-400">Gerente en Boutique Alajuela</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-8 rounded-3xl bg-slate-900/40 border border-slate-800 flex flex-col justify-between">
+          <div>
+            <div class="flex text-amber-400 text-xs gap-1 mb-4">
+              <i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i>
+            </div>
+            <p class="text-slate-300 text-sm leading-relaxed italic">
+              "El pago por Onvo Pay fue instantáneo y transparente. No tuve que esperar autorizaciones ni enviar comprobantes manuales, el plan quedó activo en el mismo momento."
+            </p>
+          </div>
+          <div class="mt-6 flex items-center gap-3 pt-4 border-t border-slate-800">
+            <div class="w-10 h-10 rounded-full bg-cyan-600 font-bold text-white flex items-center justify-center text-sm">JA</div>
+            <div>
+              <div class="text-xs font-bold text-white">Jorge Alvarado S.</div>
+              <div class="text-[11px] text-slate-400">Servicios Médicos Heredia</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ================= PREGUNTAS FRECUENTES ================= -->
+  <section id="faq" class="py-24 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 border-t border-slate-800/80">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <div class="text-center mb-16">
+        <span class="text-emerald-400 text-xs font-black uppercase tracking-wider bg-emerald-500/10 px-3.5 py-1.5 rounded-full border border-emerald-500/20">Respuestas Claras</span>
+        <h2 class="text-3xl sm:text-4xl font-black text-white mt-4 tracking-tight">Preguntas Frecuentes</h2>
+      </div>
+
+      <div class="space-y-4">
+        
+        <!-- FAQ 1 -->
+        <details class="group bg-slate-900/60 border border-slate-800 rounded-2xl p-6 [&_summary::-webkit-details-marker]:hidden">
+          <summary class="flex items-center justify-between cursor-pointer font-bold text-white text-base">
+            <span>¿Qué requisitos necesito para empezar a facturar?</span>
+            <span class="text-emerald-400 group-open:rotate-180 transition"><i class="fa-solid fa-chevron-down"></i></span>
+          </summary>
+          <p class="mt-4 text-sm text-slate-400 leading-relaxed">
+            Solo necesitas estar inscrito como contribuyente en la Administración Tributaria Virtual (ATV) de Costa Rica, contar con tu archivo de llave criptográfica (.p12) y tu usuario y contraseña de producción para comprobantes electrónicos. Si no los tienes aún, puedes usar el modo de pruebas para familiarizarte.
+          </p>
+        </details>
+
+        <!-- FAQ 2 -->
+        <details class="group bg-slate-900/60 border border-slate-800 rounded-2xl p-6 [&_summary::-webkit-details-marker]:hidden">
+          <summary class="flex items-center justify-between cursor-pointer font-bold text-white text-base">
+            <span>¿Está homologado con la versión 4.4 de Hacienda?</span>
+            <span class="text-emerald-400 group-open:rotate-180 transition"><i class="fa-solid fa-chevron-down"></i></span>
+          </summary>
+          <p class="mt-4 text-sm text-slate-400 leading-relaxed">
+            Sí, totalmente. Nuestro motor cumple con todos los esquemas XSD 4.4 oficiales: generación de clave de 50 dígitos, cálculo de IVA diferenciado, códigos CAByS, códigos de respuesta de Hacienda y código QR obligatorio en la representación gráfica.
+          </p>
+        </details>
+
+        <!-- FAQ 3 -->
+        <details class="group bg-slate-900/60 border border-slate-800 rounded-2xl p-6 [&_summary::-webkit-details-marker]:hidden">
+          <summary class="flex items-center justify-between cursor-pointer font-bold text-white text-base">
+            <span>¿Cómo funciona el pago a través de Onvo Pay?</span>
+            <span class="text-emerald-400 group-open:rotate-180 transition"><i class="fa-solid fa-chevron-down"></i></span>
+          </summary>
+          <p class="mt-4 text-sm text-slate-400 leading-relaxed">
+            Al hacer clic en el botón de pago de cualquier plan, eres redirigido a la pasarela segura de Onvo Pay (buy.onvopay.com) con cifrado SSL de 256 bits. Pagas con tu tarjeta de crédito o débito favorita y tu suscripción se activa de manera automática e inmediata.
+          </p>
+        </details>
+
+        <!-- FAQ 4 -->
+        <details class="group bg-slate-900/60 border border-slate-800 rounded-2xl p-6 [&_summary::-webkit-details-marker]:hidden">
+          <summary class="flex items-center justify-between cursor-pointer font-bold text-white text-base">
+            <span>¿Puedo cambiar de plan o cancelar cuando lo desee?</span>
+            <span class="text-emerald-400 group-open:rotate-180 transition"><i class="fa-solid fa-chevron-down"></i></span>
+          </summary>
+          <p class="mt-4 text-sm text-slate-400 leading-relaxed">
+            Sí. No tenemos plazos forzosos. Puedes cambiar de plan mensual a anual para obtener el descuento o cancelar la renovación en cualquier momento desde tu panel de usuario sin penalizaciones.
+          </p>
+        </details>
+
+        <!-- FAQ 5 -->
+        <details class="group bg-slate-900/60 border border-slate-800 rounded-2xl p-6 [&_summary::-webkit-details-marker]:hidden">
+          <summary class="flex items-center justify-between cursor-pointer font-bold text-white text-base">
+            <span>¿Cómo funciona el Editor de Facturas?</span>
+            <span class="text-emerald-400 group-open:rotate-180 transition"><i class="fa-solid fa-chevron-down"></i></span>
+          </summary>
+          <p class="mt-4 text-sm text-slate-400 leading-relaxed">
+            Dentro del panel del sistema accedes a la sección "Editor de Factura", donde dispones de controles interactivos para subir tu logotipo en alta resolución, elegir tu color de marca, seleccionar el diseño de tabla y agregar tu información bancaria y SINPE Móvil. Los cambios se guardan y aplican automáticamente a todos los PDFs que generes.
+          </p>
+        </details>
+
+        <!-- FAQ 6 -->
+        <details class="group bg-slate-900/60 border border-slate-800 rounded-2xl p-6 [&_summary::-webkit-details-marker]:hidden">
+          <summary class="flex items-center justify-between cursor-pointer font-bold text-white text-base">
+            <span>¿Mis datos y llaves criptográficas están seguros?</span>
+            <span class="text-emerald-400 group-open:rotate-180 transition"><i class="fa-solid fa-chevron-down"></i></span>
+          </summary>
+          <p class="mt-4 text-sm text-slate-400 leading-relaxed">
+            La plataforma utiliza arquitectura multi-tenant aislada sobre PostgreSQL con encriptación en reposo y en tránsito. Tus certificados criptográficos y credenciales de Hacienda son privados y solo se emplean para firmar y validar tus propios comprobantes.
+          </p>
+        </details>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ================= CTA BANNER ================= -->
+  <section class="py-20 relative overflow-hidden">
+    <div class="absolute inset-0 bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 opacity-90"></div>
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
+      <h2 class="text-3xl sm:text-5xl font-black text-white tracking-tight">
+        Moderniza la facturación de tu negocio hoy mismo
+      </h2>
+      <p class="mt-4 text-slate-300 text-base sm:text-lg max-w-2xl mx-auto">
+        Únete a cientos de empresas en Costa Rica que ya emiten sus comprobantes de forma rápida, elegante y 100% segura.
+      </p>
+      <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+        <a href="#precios" class="w-full sm:w-auto px-8 py-4 rounded-xl text-base font-extrabold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-xl shadow-emerald-500/30 transition">
+          Elegir Plan en Onvo Pay
+        </a>
+        <a href="/app" class="w-full sm:w-auto px-8 py-4 rounded-xl text-base font-bold bg-slate-900 hover:bg-slate-800 border border-slate-700 text-white transition">
+          Ingresar al Sistema
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= FOOTER ================= -->
+  <footer class="bg-slate-950 border-t border-slate-800/80 py-12 text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex flex-col md:flex-row justify-between items-center gap-6">
+        
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-sm font-bold">
+            <i class="fa-solid fa-file-invoice-dollar"></i>
+          </div>
+          <div>
+            <div class="text-white font-black text-sm">FacturaCR SaaS</div>
+            <p class="text-[11px] text-slate-400">Una solución de MeetinLabs · Costa Rica</p>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-center gap-6 text-slate-400 font-semibold">
+          <a href="#caracteristicas" class="hover:text-emerald-400 transition">Características</a>
+          <a href="#editor" class="hover:text-emerald-400 transition">Editor Visual</a>
+          <a href="#precios" class="hover:text-emerald-400 transition">Planes</a>
+          <a href="#faq" class="hover:text-emerald-400 transition">Preguntas</a>
+          <a href="/app" class="hover:text-emerald-400 transition">Portal de Clientes</a>
+        </div>
+
+        <div class="text-center md:text-right">
+          <p>© 2026 MeetinLabs. Todos los derechos reservados.</p>
+          <p class="text-[10px] text-slate-600 mt-1">Cumplimiento con Resolución DGT-R-033-2019 y actualizaciones v4.4</p>
+        </div>
+
+      </div>
+    </div>
+  </footer>
+
+  <!-- ================= SCRIPT INTERACTIVO PRECIOS ================= -->
+  <script>
+    // Enlaces oficiales Onvo Pay configurados
+    const onvoLinks = {
+      emprendedor: {
+        monthly: 'https://buy.onvopay.com/test_pC5GcXnzWE_dpFkf_sn-TeVb3rc',
+        yearly: 'https://buy.onvopay.com/test_Cr8_67VpCxoK70do1_k_QW1unfc'
+      },
+      profesional: {
+        monthly: 'https://buy.onvopay.com/test_6VzVdGxPh2TIawOt39IjUVjZcYA',
+        yearly: 'https://buy.onvopay.com/test_jQyRWv_oM8LPxmu_8ghFWrQ_FXE'
+      },
+      empresarial: {
+        monthly: 'https://buy.onvopay.com/test_Fo5VyQvXf4p2KhE0f5yUX7aDhh8',
+        yearly: 'https://buy.onvopay.com/test_UVtR8I-9TQH-zxIYZlrh5B7m1ZM'
+      }
+    };
+
+    let currentCycle = 'monthly';
+
+    function setBillingCycle(cycle) {
+      currentCycle = cycle;
+
+      const btnM = document.getElementById('btn-toggle-monthly');
+      const btnY = document.getElementById('btn-toggle-yearly');
+
+      if (cycle === 'yearly') {
+        btnY.className = 'px-6 py-2.5 rounded-xl text-xs font-black transition bg-emerald-500 text-slate-950 shadow-md flex items-center gap-2';
+        btnM.className = 'px-6 py-2.5 rounded-xl text-xs font-black transition text-slate-400 hover:text-white';
+
+        // Precios Anuales
+        document.getElementById('price-emprendedor').innerText = '$150';
+        document.getElementById('cycle-emprendedor').innerText = '/ año';
+        document.getElementById('save-emprendedor').innerHTML = '🔥 Ahorras $30 al año (2 meses gratis)';
+        document.getElementById('link-emprendedor').href = onvoLinks.emprendedor.yearly;
+
+        document.getElementById('price-profesional').innerText = '$350';
+        document.getElementById('cycle-profesional').innerText = '/ año';
+        document.getElementById('save-profesional').innerHTML = '🔥 Ahorras $70 al año (2 meses gratis)';
+        document.getElementById('link-profesional').href = onvoLinks.profesional.yearly;
+
+        document.getElementById('price-empresarial').innerText = '$750';
+        document.getElementById('cycle-empresarial').innerText = '/ año';
+        document.getElementById('save-empresarial').innerHTML = '🔥 Ahorras $150 al año (2 meses gratis)';
+        document.getElementById('link-empresarial').href = onvoLinks.empresarial.yearly;
+
+      } else {
+        btnM.className = 'px-6 py-2.5 rounded-xl text-xs font-black transition bg-emerald-500 text-slate-950 shadow-md';
+        btnY.className = 'px-6 py-2.5 rounded-xl text-xs font-black transition text-slate-400 hover:text-white flex items-center gap-2';
+
+        // Precios Mensuales
+        document.getElementById('price-emprendedor').innerText = '$15';
+        document.getElementById('cycle-emprendedor').innerText = '/ mes';
+        document.getElementById('save-emprendedor').innerHTML = 'Cobro mensual flexible';
+        document.getElementById('link-emprendedor').href = onvoLinks.emprendedor.monthly;
+
+        document.getElementById('price-profesional').innerText = '$35';
+        document.getElementById('cycle-profesional').innerText = '/ mes';
+        document.getElementById('save-profesional').innerHTML = 'Comprobantes 100% ilimitados';
+        document.getElementById('link-profesional').href = onvoLinks.profesional.monthly;
+
+        document.getElementById('price-empresarial').innerText = '$75';
+        document.getElementById('cycle-empresarial').innerText = '/ mes';
+        document.getElementById('save-empresarial').innerHTML = 'Multi-sucursal & Soporte VIP';
+        document.getElementById('link-empresarial').href = onvoLinks.empresarial.monthly;
+      }
+    }
+  </script>
+
+</body>
+</html>

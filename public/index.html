@@ -70,6 +70,12 @@
         <button type="submit" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black shadow-md transition">Crear cuenta y comenzar</button>
       </form>
       <div id="auth-error" class="hidden mx-8 mb-6 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold"></div>
+      <div class="px-8 pb-6 text-center border-t border-slate-100 pt-3">
+        <a href="/landing" class="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center justify-center gap-1.5 transition">
+          <i class="fa-solid fa-globe"></i>
+          <span>Ver Información y Planes de Suscripción (Landing)</span>
+        </a>
+      </div>
     </div>
   </div>
 
@@ -149,6 +155,10 @@
           <i class="fa-solid fa-crown w-5 text-sm"></i>
           <span>Panel SuperAdmin</span>
         </button>
+        <a href="/landing" target="_blank" class="nav-item w-full flex items-center space-x-3 px-3.5 py-3 rounded-xl text-teal-400 hover:text-white hover:bg-slate-800/60 transition font-bold">
+          <i class="fa-solid fa-globe w-5 text-sm"></i>
+          <span>Portal & Planes</span>
+        </a>
       </nav>
     </div>
 
@@ -5143,11 +5153,31 @@
         : '<p class="text-slate-500">Sin pagos registrados.</p>';
     }
 
+    const ONVO_DIRECT_LINKS = {
+      emprendedor: {
+        monthly: 'https://buy.onvopay.com/test_pC5GcXnzWE_dpFkf_sn-TeVb3rc',
+        yearly: 'https://buy.onvopay.com/test_Cr8_67VpCxoK70do1_k_QW1unfc'
+      },
+      pro: {
+        monthly: 'https://buy.onvopay.com/test_6VzVdGxPh2TIawOt39IjUVjZcYA',
+        yearly: 'https://buy.onvopay.com/test_jQyRWv_oM8LPxmu_8ghFWrQ_FXE'
+      },
+      profesional: {
+        monthly: 'https://buy.onvopay.com/test_6VzVdGxPh2TIawOt39IjUVjZcYA',
+        yearly: 'https://buy.onvopay.com/test_jQyRWv_oM8LPxmu_8ghFWrQ_FXE'
+      },
+      empresarial: {
+        monthly: 'https://buy.onvopay.com/test_Fo5VyQvXf4p2KhE0f5yUX7aDhh8',
+        yearly: 'https://buy.onvopay.com/test_UVtR8I-9TQH-zxIYZlrh5B7m1ZM'
+      }
+    };
+
     function renderPlanesSuscripcion() {
       const actual = currentBilling?.plan?.code;
       document.getElementById('sus-planes').innerHTML = billingPlanes.filter(p => p.code !== 'trial').map(p => {
         const precio = cicloFacturacion === 'yearly' ? p.precio_anual_usd : p.precio_mensual_usd;
         const esActual = p.code === actual;
+        const onvoLink = ONVO_DIRECT_LINKS[p.code]?.[cicloFacturacion];
         return `<div class="bg-white p-5 rounded-2xl border ${esActual ? 'border-emerald-500 ring-2 ring-emerald-200' : 'border-slate-200'} shadow-sm text-xs flex flex-col">
           <div class="font-black text-slate-800 text-base">${escSaas(p.nombre)}</div>
           <div class="text-slate-500 min-h-[32px]">${escSaas(p.descripcion || '')}</div>
@@ -5158,7 +5188,10 @@
             <li><i class="fa-solid ${p.permite_imap_gastos ? 'fa-check text-emerald-600' : 'fa-xmark text-slate-300'}"></i> Gastos automáticos por correo (IMAP)</li>
             <li><i class="fa-solid ${p.permite_envio_correo ? 'fa-check text-emerald-600' : 'fa-xmark text-slate-300'}"></i> Envío de comprobantes por correo</li>
           </ul>
-          <button onclick="suscribirsePlan('${escSaas(p.code)}')" class="mt-4 py-2.5 rounded-xl font-bold ${esActual ? 'bg-slate-100 text-slate-700' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}">${esActual ? 'Renovar / Extender' : 'Suscribirme con tarjeta'}</button>
+          <div class="mt-4 space-y-2">
+            <button onclick="suscribirsePlan('${escSaas(p.code)}')" class="w-full py-2.5 rounded-xl font-bold ${esActual ? 'bg-slate-100 text-slate-700' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}">${esActual ? 'Renovar / Extender' : 'Pagar con Tarjeta (Onvo Pay)'}</button>
+            ${onvoLink ? `<a href="${onvoLink}" target="_blank" rel="noopener noreferrer" class="w-full py-2 rounded-xl font-bold bg-slate-900 hover:bg-slate-800 text-emerald-400 text-center flex items-center justify-center gap-1.5 transition"><i class="fa-solid fa-credit-card"></i> Checkout Onvo Pay</a>` : ''}
+          </div>
         </div>`;
       }).join('');
     }

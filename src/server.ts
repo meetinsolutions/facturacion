@@ -38,6 +38,7 @@ import {
   requireSuperAdmin,
   setAuthCookie,
   clearAuthCookie,
+  AUTH_COOKIE_NAME,
   registrarTenantYAdmin,
   autenticarUsuario,
   cambiarContrasena,
@@ -85,6 +86,43 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     res.setHeader('Expires', '0');
   }
   next();
+});
+
+// Enlaces oficiales directos de Onvo Pay para planes
+export const ONVO_CHECKOUT_LINKS: Record<string, { monthly: string; yearly: string }> = {
+  emprendedor: {
+    monthly: 'https://buy.onvopay.com/test_pC5GcXnzWE_dpFkf_sn-TeVb3rc',
+    yearly: 'https://buy.onvopay.com/test_Cr8_67VpCxoK70do1_k_QW1unfc'
+  },
+  pro: {
+    monthly: 'https://buy.onvopay.com/test_6VzVdGxPh2TIawOt39IjUVjZcYA',
+    yearly: 'https://buy.onvopay.com/test_jQyRWv_oM8LPxmu_8ghFWrQ_FXE'
+  },
+  profesional: {
+    monthly: 'https://buy.onvopay.com/test_6VzVdGxPh2TIawOt39IjUVjZcYA',
+    yearly: 'https://buy.onvopay.com/test_jQyRWv_oM8LPxmu_8ghFWrQ_FXE'
+  },
+  empresarial: {
+    monthly: 'https://buy.onvopay.com/test_Fo5VyQvXf4p2KhE0f5yUX7aDhh8',
+    yearly: 'https://buy.onvopay.com/test_UVtR8I-9TQH-zxIYZlrh5B7m1ZM'
+  }
+};
+
+// Rutas amigables para Landing Page y Aplicación SaaS
+app.get(['/landing', '/precios', '/planes'], (req: Request, res: Response) => {
+  res.sendFile(path.join(process.cwd(), 'public', 'landing.html'));
+});
+
+app.get('/app', (req: Request, res: Response) => {
+  res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
+});
+
+// Raíz: si el usuario ya tiene sesión activa o solicita la app, va al dashboard; si no, ve la Landing Page
+app.get('/', (req: Request, res: Response, next: NextFunction) => {
+  if (req.cookies?.[AUTH_COOKIE_NAME] || req.query.app === '1') {
+    return res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
+  }
+  res.sendFile(path.join(process.cwd(), 'public', 'landing.html'));
 });
 
 // Servir la interfaz estática
@@ -363,7 +401,8 @@ app.get('/api/planes', ah(async (req, res) => {
     success: true,
     data: planes,
     sinpe: gateways.sinpe,
-    pasarelaActiva: gateways.pasarelaActiva
+    pasarelaActiva: gateways.pasarelaActiva,
+    onvoLinks: ONVO_CHECKOUT_LINKS
   });
 }));
 
