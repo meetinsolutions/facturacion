@@ -216,10 +216,10 @@ export async function initDatabaseSchema(): Promise<void> {
     {
       code: 'trial',
       nombre: 'Prueba Gratis 14 Días',
-      descripcion: 'Prueba completa con envío PDF+XML y Control de Gastos IMAP durante 14 días.',
+      descripcion: 'Prueba completa con envío PDF+XML y Control de Gastos IMAP (hasta 5 comprobantes).',
       mensual: 0,
       anual: 0,
-      limiteComp: 15,
+      limiteComp: 5,
       limiteUsers: 1,
       imap: true,
       correo: true,
