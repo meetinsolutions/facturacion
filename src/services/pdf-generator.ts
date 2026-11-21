@@ -27,7 +27,7 @@ function resolverRutaNavegador(): string {
 
 export async function generarFacturaPDFBuffer(
   html: string,
-  options?: { format?: 'Letter' | 'A4' }
+  options?: { format?: 'Letter' | 'A4'; landscape?: boolean }
 ): Promise<Buffer> {
   const executablePath = resolverRutaNavegador();
   const browser = await puppeteer.launch({
@@ -46,6 +46,7 @@ export async function generarFacturaPDFBuffer(
     await page.emulateMediaType('print');
     const pdf = await page.pdf({
       format: options?.format || 'Letter',
+      landscape: options?.landscape ?? false,
       printBackground: true,
       preferCSSPageSize: true
     });

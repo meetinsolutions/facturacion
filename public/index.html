@@ -717,6 +717,14 @@
               <i class="fa-solid fa-file-csv text-sky-600"></i>
               <span>Exportar CSV / Excel</span>
             </button>
+            <button type="button" onclick="abrirReporteEjecutivoGastos('html')" class="px-3.5 py-2 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-800 rounded-xl text-xs font-bold shadow-sm inline-flex items-center space-x-1.5 transition" title="Emitir reporte ejecutivo en HTML para visualizar e imprimir">
+              <i class="fa-solid fa-file-lines text-indigo-600"></i>
+              <span>Reporte Ejecutivo HTML</span>
+            </button>
+            <button type="button" onclick="abrirReporteEjecutivoGastos('pdf')" class="px-3.5 py-2 bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-800 rounded-xl text-xs font-bold shadow-sm inline-flex items-center space-x-1.5 transition" title="Descargar reporte ejecutivo directamente en PDF">
+              <i class="fa-solid fa-file-pdf text-rose-600"></i>
+              <span>Exportar PDF</span>
+            </button>
             <button type="button" id="btn-sync-gastos" onclick="sincronizarGastosCorreo()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold shadow-sm inline-flex items-center space-x-1.5 transition">
               <i class="fa-solid fa-rotate"></i>
               <span>Sincronizar Correos</span>
@@ -5003,6 +5011,25 @@
       if (est) params.set('estado', est);
       const qs = params.toString() ? `?${params.toString()}` : '';
       window.location.href = `/api/gastos/exportar-csv${qs}`;
+    }
+
+    function abrirReporteEjecutivoGastos(tipo = 'html') {
+      const params = new URLSearchParams();
+      const mes = document.getElementById('filter-gastos-mes')?.value || '';
+      const cat = document.getElementById('filter-gastos-cat')?.value || '';
+      const est = document.getElementById('filter-gastos-estado')?.value || '';
+      const q = document.getElementById('search-gastos')?.value?.trim() || '';
+      if (mes) params.set('mes', mes);
+      if (cat) params.set('categoria', cat);
+      if (est) params.set('estado', est);
+      if (q) params.set('q', q);
+      const qs = params.toString() ? `?${params.toString()}` : '';
+
+      if (tipo === 'pdf') {
+        window.open(`/api/gastos/reporte-pdf${qs}`, '_blank');
+      } else {
+        window.open(`/api/gastos/reporte-html${qs}`, '_blank');
+      }
     }
 
     async function guardarConfiguracionTotal() {

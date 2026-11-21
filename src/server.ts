@@ -28,6 +28,7 @@ import {
 import { generarFacturaPDFBuffer } from './services/pdf-generator.js';
 import { enviarComprobantePorCorreo, probarConexionCorreo } from './services/email-service.js';
 import { parsearFacturaXMLCostaRica } from './services/xml-expense-parser.js';
+import { generarReporteGastosHTML } from './services/reporte-gastos-renderer.js';
 import { probarConexionIMAP, sincronizarGastosDesdeCorreo, normalizarCedula } from './services/imap-expense-sync.js';
 import { ensureSshTunnelIfEnabled } from './db/ssh-tunnel.js';
 import { pool } from './db/pool.js';
@@ -1340,6 +1341,76 @@ app.get('/api/gastos/exportar-csv', ah(async (req, res) => {
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="gastos.csv"');
   res.send(csvContent);
+}));
+
+app.get('/api/gastos/reporte-html', ah(async (req, res) => {
+  const t = tid(req);
+  const mes = String(req.query.mes || '').trim();
+  const categoria = String(req.query.categoria || '').trim();
+  const estado = String(req.query.estado || '').trim();
+  const busqueda = String(req.query.q || '').trim().toLowerCase();
+
+  const todos = await pgDataStore.getGastos(t);
+  const gastosFiltrados = todos.filter(g => {
+    if (mes && !String(g.fechaEmision || '').startsWith(mes)) return false;
+    if (categoria && g.categoriaGasto !== categoria) return false;
+    if (estado && g.estadoConfirmacion !== estado) return false;
+    if (busqueda) {
+      const match = [g.emisorNombre, g.emisorNombreComercial, g.emisorCedula, g.clave, g.consecutivo, g.categoriaGasto]
+        .filter(Boolean)
+        .some(v => String(v).toLowerCase().includes(busqueda));
+      if (!match) return false;
+    }
+    return true;
+  });
+
+  const config = await pgDataStore.getConfig(t);
+  const html = generarReporteGastosHTML({
+    gastos: gastosFiltrados,
+    config,
+    filtros: { mes, categoria, estado, busqueda },
+    usuario: (req as any).auth?.email
+  });
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(html);
+}));
+
+app.get('/api/gastos/reporte-pdf', ah(async (req, res) => {
+  const t = tid(req);
+  const mes = String(req.query.mes || '').trim();
+  const categoria = String(req.query.categoria || '').trim();
+  const estado = String(req.query.estado || '').trim();
+  const busqueda = String(req.query.q || '').trim().toLowerCase();
+
+  const todos = await pgDataStore.getGastos(t);
+  const gastosFiltrados = todos.filter(g => {
+    if (mes && !String(g.fechaEmision || '').startsWith(mes)) return false;
+    if (categoria && g.categoriaGasto !== categoria) return false;
+    if (estado && g.estadoConfirmacion !== estado) return false;
+    if (busqueda) {
+      const match = [g.emisorNombre, g.emisorNombreComercial, g.emisorCedula, g.clave, g.consecutivo, g.categoriaGasto]
+        .filter(Boolean)
+        .some(v => String(v).toLowerCase().includes(busqueda));
+      if (!match) return false;
+    }
+    return true;
+  });
+
+  const config = await pgDataStore.getConfig(t);
+  const html = generarReporteGastosHTML({
+    gastos: gastosFiltrados,
+    config,
+    filtros: { mes, categoria, estado, busqueda },
+    usuario: (req as any).auth?.email
+  });
+
+  const pdfBuffer = await generarFacturaPDFBuffer(html, { format: 'Letter', landscape: true });
+  const filename = `Reporte_Gastos_${mes || 'general'}_${new Date().toISOString().slice(0, 10)}.pdf`;
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+  res.send(pdfBuffer);
 }));
 
 app.put('/api/gastos/:clave', ah(async (req, res) => {
