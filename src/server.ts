@@ -1376,6 +1376,18 @@ app.get('/api/gastos/:clave/pdf', ah(async (req, res) => {
   res.send(data);
 }));
 
+app.post('/api/gastos/:clave/pdf', ah(async (req, res) => {
+  const t = tid(req);
+  const clave = String(req.params.clave);
+  const { pdfBase64 } = req.body || {};
+  if (!pdfBase64 || typeof pdfBase64 !== 'string') {
+    return res.status(400).json({ success: false, error: 'Debe enviar el archivo PDF en base64.' });
+  }
+  const buffer = Buffer.from(pdfBase64.replace(/^data:application\/pdf;base64,/, ''), 'base64');
+  const ok = await pgDataStore.saveGastoPdf(t, clave, buffer);
+  res.json({ success: ok });
+}));
+
 // ==========================================
 // SCHEDULERS MULTI-TENANT
 // ==========================================

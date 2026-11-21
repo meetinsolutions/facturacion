@@ -581,8 +581,8 @@ export async function procesarWebhook(provider: string, body: any) {
 
   if (provider === 'onvopay') {
     const txId = body?.data?.metadata?.transactionId || body?.metadata?.transactionId;
-    const event = body?.type || body?.event;
-    if (txId && (event === 'payment-intent.succeeded' || body?.status === 'succeeded')) {
+    const event = String(body?.type || body?.event || '').replace(/_/g, '-');
+    if (txId && (event === 'payment-intent.succeeded' || event === 'subscription-renewal.succeeded' || body?.status === 'succeeded')) {
       await completarPagoYActivarSuscripcion(txId, body?.data?.id || body?.id);
     }
     return { received: true };

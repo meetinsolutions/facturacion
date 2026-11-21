@@ -792,6 +792,14 @@ export class PgDataStore {
     return res.rows[0].data;
   }
 
+  async saveGastoPdf(tenantId: string, clave: string, pdfBuffer: Buffer): Promise<boolean> {
+    const res = await pool.query(
+      `UPDATE gastos SET pdf_content = $3, tiene_pdf = TRUE, updated_at = NOW() WHERE tenant_id = $1 AND clave = $2`,
+      [tenantId, clave, pdfBuffer]
+    );
+    return (res.rowCount || 0) > 0;
+  }
+
   async saveEstadoSyncGastos(tenantId: string, estado: EstadoSyncGastos): Promise<void> {
     await pool.query(
       `INSERT INTO gastos_sync_estado (tenant_id, ultima_sincronizacion, ultimo_resumen_json, ultimo_error)
