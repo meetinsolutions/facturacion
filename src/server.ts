@@ -413,75 +413,181 @@ app.get('/api/planes', ah(async (req, res) => {
   });
 }));
 
+function safeCompare(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+function esTimestampValido(tsRaw: string | number, maxDiffSegundos = 300): boolean {
+  if (!tsRaw) return false;
+  const tsNum = typeof tsRaw === 'number' ? tsRaw : parseInt(String(tsRaw), 10);
+  if (isNaN(tsNum) || tsNum <= 0) return false;
+  const tsSegundos = tsNum > 1e11 ? Math.floor(tsNum / 1000) : tsNum;
+  const ahoraSegundos = Math.floor(Date.now() / 1000);
+  return Math.abs(ahoraSegundos - tsSegundos) <= maxDiffSegundos;
+}
+
 function verificarFirmaWebhook(
   provider: string,
   secretEsperado: string,
   req: Request
 ): boolean {
-  if (!secretEsperado) return true;
-
-  // 1. Verificación directa por query param o header
-  const recibidoDirecto = String(req.query.secret || req.headers['x-webhook-secret'] || '');
-  if (recibidoDirecto && recibidoDirecto === secretEsperado) {
-    return true;
+  if (!secretEsperado || typeof secretEsperado !== 'string' || !secretEsperado.trim()) {
+    return false;
   }
 
-  // 2. Verificación para Onvo Pay (soporta firmas Svix HMAC-SHA256 y pings de prueba)
+  const rawBody = (req as any).rawBody || JSON.stringify(req.body || {});
+
+  // 1. Verificación para Onvo Pay (soporta formato nativo X-Onvo-Signature y headers Svix)
   if (provider === 'onvopay') {
-    const rawBody = (req as any).rawBody || JSON.stringify(req.body || {});
-    const msgId = (req.headers['svix-id'] || req.headers['webhook-id']) as string;
-    const msgTimestamp = (req.headers['svix-timestamp'] || req.headers['webhook-timestamp']) as string;
-    const msgSignature = (req.headers['svix-signature'] || req.headers['webhook-signature'] || req.headers['x-onvo-signature']) as string;
+    const onvoHeader = (req.headers['x-onvo-signature'] || req.headers['X-Onvo-Signature']) as string;
+    const svixId = (req.headers['svix-id'] || req.headers['webhook-id']) as string;
+    const svixTimestamp = (req.headers['svix-timestamp'] || req.headers['webhook-timestamp']) as string;
+    const svixSignature = (req.headers['svix-signature'] || req.headers['webhook-signature']) as string;
 
-    if (msgSignature) {
-      try {
-        const key = secretEsperado.startsWith('whsec_')
-          ? Buffer.from(secretEsperado.slice(6), 'base64')
-          : Buffer.from(secretEsperado, 'utf-8');
+    // A) Formato Documentado Oficial ONVO: 'x-onvo-signature: t=...,v1=...'
+    if (onvoHeader) {
+      const parts = onvoHeader.split(',');
+      let tValue: string | undefined;
+      const signaturesRecibidas: string[] = [];
 
-        if (msgId && msgTimestamp) {
-          const toSign = `${msgId}.${msgTimestamp}.${rawBody}`;
-          const expectedSig = crypto.createHmac('sha256', key).update(toSign).digest('base64');
-          const sigs = String(msgSignature).split(' ');
-          for (const s of sigs) {
-            const parts = s.split(',');
-            const sigValue = parts.length > 1 ? parts[1] : parts[0];
-            if (sigValue === expectedSig) return true;
+      for (const p of parts) {
+        const idx = p.indexOf('=');
+        if (idx > -1) {
+          const k = p.slice(0, idx).trim();
+          const v = p.slice(idx + 1).trim();
+          if (k === 't') tValue = v;
+          else if (k === 'v1' && v) signaturesRecibidas.push(v);
+        }
+      }
+
+      if (tValue && signaturesRecibidas.length > 0) {
+        if (!esTimestampValido(tValue, 300)) {
+          console.warn('[ONVO WEBHOOK] Timestamp fuera de tolerancia (anti-replay):', tValue);
+          return false;
+        }
+
+        const toSign = `${tValue}.${rawBody}`;
+        const keys: Buffer[] = [Buffer.from(secretEsperado, 'utf-8')];
+        if (secretEsperado.startsWith('whsec_')) {
+          try {
+            keys.push(Buffer.from(secretEsperado.slice(6), 'base64'));
+          } catch { /* ignorar */ }
+        }
+
+        for (const key of keys) {
+          const sigHex = crypto.createHmac('sha256', key).update(toSign).digest('hex');
+          const sigB64 = crypto.createHmac('sha256', key).update(toSign).digest('base64');
+          for (const recibida of signaturesRecibidas) {
+            if (safeCompare(recibida, sigHex) || safeCompare(recibida, sigB64)) {
+              return true;
+            }
           }
         }
-
-        const hmacB64 = crypto.createHmac('sha256', key).update(rawBody).digest('base64');
-        const hmacHex = crypto.createHmac('sha256', key).update(rawBody).digest('hex');
-        if (msgSignature.includes(hmacB64) || msgSignature.includes(hmacHex)) {
-          return true;
-        }
-      } catch (err) {
-        console.error('[ONVO WEBHOOK] Error al verificar firma:', err);
       }
     }
 
-    // Aceptar pings de prueba oficiales emitidos desde el dashboard de Onvo
-    const userAgent = String(req.headers['user-agent'] || '');
-    if (userAgent.includes('ONVO-Webhooks') || userAgent.includes('Svix')) {
+    // B) Formato Svix Headers (svix-id, svix-timestamp, svix-signature)
+    if (svixSignature && svixId && svixTimestamp) {
+      if (!esTimestampValido(svixTimestamp, 300)) {
+        console.warn('[ONVO WEBHOOK] Svix Timestamp fuera de tolerancia (anti-replay):', svixTimestamp);
+        return false;
+      }
+
+      const toSign = `${svixId}.${svixTimestamp}.${rawBody}`;
+      const keys: Buffer[] = [];
+      if (secretEsperado.startsWith('whsec_')) {
+        try {
+          keys.push(Buffer.from(secretEsperado.slice(6), 'base64'));
+        } catch { /* ignorar */ }
+      }
+      keys.push(Buffer.from(secretEsperado, 'utf-8'));
+
+      const sigList = svixSignature.split(' ').map(s => {
+        const parts = s.split(',');
+        return parts.length > 1 ? parts[1] : parts[0];
+      }).filter(Boolean);
+
+      for (const key of keys) {
+        const sigB64 = crypto.createHmac('sha256', key).update(toSign).digest('base64');
+        const sigHex = crypto.createHmac('sha256', key).update(toSign).digest('hex');
+        for (const s of sigList) {
+          if (safeCompare(s, sigB64) || safeCompare(s, sigHex)) {
+            return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  }
+
+  // 2. Verificación para Stripe (stripe-signature: t=...,v1=...)
+  if (provider === 'stripe') {
+    const stripeHeader = (req.headers['stripe-signature'] || '') as string;
+    if (!stripeHeader) return false;
+
+    const parts = stripeHeader.split(',');
+    let tValue: string | undefined;
+    const signatures: string[] = [];
+    for (const p of parts) {
+      const idx = p.indexOf('=');
+      if (idx > -1) {
+        const k = p.slice(0, idx).trim();
+        const v = p.slice(idx + 1).trim();
+        if (k === 't') tValue = v;
+        else if (k === 'v1' && v) signatures.push(v);
+      }
+    }
+
+    if (!tValue || signatures.length === 0 || !esTimestampValido(tValue, 300)) {
+      return false;
+    }
+
+    const toSign = `${tValue}.${rawBody}`;
+    const expectedSig = crypto.createHmac('sha256', secretEsperado).update(toSign).digest('hex');
+    for (const s of signatures) {
+      if (safeCompare(s, expectedSig)) return true;
+    }
+    return false;
+  }
+
+  // 3. Verificación para Tilopay (header seguro x-webhook-secret)
+  if (provider === 'tilopay') {
+    const tokenHeader = String(req.headers['x-webhook-secret'] || req.headers['x-tilopay-signature'] || '');
+    if (tokenHeader && safeCompare(tokenHeader, secretEsperado)) {
       return true;
     }
+    return false;
   }
 
   return false;
 }
 
 app.post('/api/billing/webhook/:provider', ah(async (req, res) => {
-  const provider = String(req.params.provider);
+  const provider = String(req.params.provider).toLowerCase();
+
+  if (!['onvopay', 'stripe', 'tilopay'].includes(provider)) {
+    console.warn(`[WEBHOOK] Proveedor no soportado: ${provider}`);
+    return res.status(400).json({ success: false, error: 'Proveedor no soportado.' });
+  }
+
   const gateways = await getGatewaysConfig();
   const secretEsperado =
     provider === 'stripe' ? gateways.stripe.webhookSecret :
     provider === 'onvopay' ? gateways.onvopay.webhookSecret :
     provider === 'tilopay' ? gateways.tilopay.webhookSecret : '';
 
-  console.log(`[WEBHOOK ${provider}] Recibido de ${req.headers['user-agent'] || 'desconocido'}`);
+  if (!secretEsperado) {
+    console.error(`[WEBHOOK ${provider}] Rechazado: webhookSecret no configurado en el servidor.`);
+    return res.status(500).json({ success: false, error: 'Webhook secret no configurado en el servidor.' });
+  }
 
-  if (secretEsperado && !verificarFirmaWebhook(provider, secretEsperado, req)) {
-    console.warn(`[WEBHOOK ${provider}] Firma de webhook inválida.`);
+  if (!verificarFirmaWebhook(provider, secretEsperado, req)) {
+    console.warn(`[WEBHOOK ${provider}] Firma de webhook inválida o expirada.`);
     return res.status(401).json({ success: false, error: 'Firma de webhook inválida.' });
   }
 
