@@ -471,39 +471,100 @@ export async function iniciarCheckoutRecurrente(
 
 export async function completarPagoYActivarSuscripcion(
   transactionId: string,
+  expectedProvider: string,
   providerReference?: string,
   providerSubscriptionId?: string
 ) {
   return await withTransaction(async (client) => {
-    const txRes = await client.query('SELECT * FROM payment_transactions WHERE id = $1 FOR UPDATE', [transactionId]);
-    if (!txRes.rowCount) {
-      throw new Error('Transacción de pago no encontrada.');
-    }
-    const tx = txRes.rows[0];
-    if (tx.status === 'paid') {
-      return { alreadyPaid: true, tenantId: tx.tenant_id };
-    }
-
-    await client.query(
-      `UPDATE payment_transactions
-       SET status = 'paid',
-           paid_at = NOW(),
-           provider_reference = COALESCE($2, provider_reference)
-       WHERE id = $1`,
-      [transactionId, providerReference || null]
+    const txRes = await client.query(
+      `SELECT *
+       FROM payment_transactions
+       WHERE id = $1
+       FOR UPDATE`,
+      [transactionId]
     );
 
-    const dias = tx.billing_cycle === 'yearly' ? 365 : 30;
-    const subRes = await client.query('SELECT * FROM subscriptions WHERE tenant_id = $1 FOR UPDATE', [tx.tenant_id]);
+    if (txRes.rowCount !== 1) {
+      throw new Error('Transacción de pago no encontrada.');
+    }
+
+    const tx = txRes.rows[0];
+
+    // Validar el proveedor incluso en pagos ya confirmados.
+    if (tx.provider !== expectedProvider) {
+      throw new Error(
+        'El proveedor del pago no coincide con el proveedor de confirmación.'
+      );
+    }
+
+    // Idempotencia: nunca extender dos veces el mismo pago.
+    if (tx.status === 'paid') {
+      return {
+        alreadyPaid: true,
+        tenantId: tx.tenant_id
+      };
+    }
+
+    if (tx.status !== 'pending') {
+      throw new Error(
+        `No se puede confirmar una transacción en estado ${tx.status}.`
+      );
+    }
+
+    if (
+      tx.billing_cycle !== 'monthly' &&
+      tx.billing_cycle !== 'yearly'
+    ) {
+      throw new Error('Ciclo de facturación no válido.');
+    }
+
+    const subRes = await client.query(
+      `SELECT *
+       FROM subscriptions
+       WHERE tenant_id = $1
+       FOR UPDATE`,
+      [tx.tenant_id]
+    );
+
+    if (subRes.rowCount !== 1) {
+      throw new Error(
+        'No existe una suscripción válida para esta empresa.'
+      );
+    }
+
+    const sub = subRes.rows[0];
+
+    // Verificar que la relación de la transacción sea consistente.
+    if (
+      tx.subscription_id &&
+      tx.subscription_id !== sub.id
+    ) {
+      throw new Error(
+        'La transacción no corresponde a la suscripción de la empresa.'
+      );
+    }
+
     const now = new Date();
     let inicio = now;
-    if (subRes.rowCount && subRes.rows[0].status === 'active' && subRes.rows[0].plan_code === tx.plan_code) {
-      const actualFin = new Date(subRes.rows[0].current_period_end);
-      if (actualFin > now) inicio = actualFin;
+
+    if (
+      sub.status === 'active' &&
+      sub.plan_code === tx.plan_code
+    ) {
+      const actualFin = new Date(sub.current_period_end);
+
+      if (actualFin > now) {
+        inicio = actualFin;
+      }
     }
+
+    // Mantener temporalmente el cálculo vigente.
+    // La migración a períodos calendario se realizará
+    // después de validar los ciclos del proveedor.
+    const dias = tx.billing_cycle === 'yearly' ? 365 : 30;
     const fin = new Date(inicio.getTime() + dias * 86400_000);
 
-    await client.query(
+    const updateSubRes = await client.query(
       `UPDATE subscriptions
        SET plan_code = $2,
            status = 'active',
@@ -512,14 +573,53 @@ export async function completarPagoYActivarSuscripcion(
            current_period_end = $5,
            next_billing_date = $5,
            provider = $6,
-           provider_subscription_id = COALESCE($7, provider_subscription_id),
+           provider_subscription_id =
+             COALESCE($7, provider_subscription_id),
            cancel_at_period_end = FALSE,
            updated_at = NOW()
-       WHERE tenant_id = $1`,
-      [tx.tenant_id, tx.plan_code, tx.billing_cycle, now, fin, tx.provider, providerSubscriptionId || null]
+       WHERE id = $1
+         AND tenant_id = $8`,
+      [
+        sub.id,
+        tx.plan_code,
+        tx.billing_cycle,
+        inicio,
+        fin,
+        tx.provider,
+        providerSubscriptionId || null,
+        tx.tenant_id
+      ]
     );
 
-    return { alreadyPaid: false, tenantId: tx.tenant_id, planCode: tx.plan_code, periodEnd: fin };
+    if (updateSubRes.rowCount !== 1) {
+      throw new Error(
+        'Fallo de integridad al actualizar la suscripción.'
+      );
+    }
+
+    const updateTxRes = await client.query(
+      `UPDATE payment_transactions
+       SET status = 'paid',
+           paid_at = NOW(),
+           provider_reference =
+             COALESCE(provider_reference, $2)
+       WHERE id = $1
+         AND status = 'pending'`,
+      [transactionId, providerReference || null]
+    );
+
+    if (updateTxRes.rowCount !== 1) {
+      throw new Error(
+        'Fallo de integridad al confirmar el pago.'
+      );
+    }
+
+    return {
+      alreadyPaid: false,
+      tenantId: tx.tenant_id,
+      planCode: tx.plan_code,
+      periodEnd: fin
+    };
   });
 }
 
@@ -554,9 +654,14 @@ export async function procesarWebhook(provider: string, body: any) {
   if (provider === 'stripe') {
     const type = body?.type;
     const obj = body?.data?.object;
-    if (type === 'checkout.session.completed' && obj?.metadata?.transaction_id) {
+    if (
+      type === 'checkout.session.completed' &&
+      obj?.metadata?.transaction_id &&
+      obj?.payment_status === 'paid'
+    ) {
       await completarPagoYActivarSuscripcion(
         obj.metadata.transaction_id,
+        'stripe',
         obj.id,
         typeof obj.subscription === 'string' ? obj.subscription : undefined
       );
@@ -582,8 +687,8 @@ export async function procesarWebhook(provider: string, body: any) {
   if (provider === 'onvopay') {
     const txId = body?.data?.metadata?.transactionId || body?.metadata?.transactionId;
     const event = String(body?.type || body?.event || '').replace(/_/g, '-');
-    if (txId && (event === 'payment-intent.succeeded' || event === 'subscription-renewal.succeeded' || body?.status === 'succeeded')) {
-      await completarPagoYActivarSuscripcion(txId, body?.data?.id || body?.id);
+    if (txId && event === 'payment-intent.succeeded') {
+      await completarPagoYActivarSuscripcion(txId, 'onvopay', body?.data?.id || body?.id);
     }
     return { received: true };
   }
@@ -591,7 +696,7 @@ export async function procesarWebhook(provider: string, body: any) {
   if (provider === 'tilopay') {
     const txId = body?.orderNumber || body?.order;
     if (txId && (body?.code === '1' || body?.status === 'approved')) {
-      await completarPagoYActivarSuscripcion(txId, body?.tpt || body?.auth);
+      await completarPagoYActivarSuscripcion(txId, 'tilopay', body?.tpt || body?.auth);
     }
     return { received: true };
   }
@@ -664,7 +769,7 @@ export async function asignarPlanManual(
 }
 
 export async function aprobarPagoManual(txId: string) {
-  return await completarPagoYActivarSuscripcion(txId);
+  return await completarPagoYActivarSuscripcion(txId, 'manual_sinpe');
 }
 
 export async function rechazarPagoManual(txId: string, motivo?: string) {

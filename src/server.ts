@@ -629,7 +629,12 @@ app.post('/api/billing/sandbox/confirmar', requireAdmin, ah(async (req, res) => 
   if (!tx.rowCount || tx.rows[0].tenant_id !== tid(req) || tx.rows[0].provider !== 'sandbox') {
     return res.status(404).json({ success: false, error: 'Transacción sandbox no encontrada.' });
   }
-  const result = await completarPagoYActivarSuscripcion(txId, `sandbox_${Date.now()}`, `sandbox_sub_${tid(req)}`);
+  const result = await completarPagoYActivarSuscripcion(
+    txId,
+    'sandbox',
+    `sandbox_${Date.now()}`,
+    `sandbox_sub_${tid(req)}`
+  );
   res.json({ success: true, data: result, suscripcion: await getEstadoSuscripcion(tid(req)) });
 }));
 
