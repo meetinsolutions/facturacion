@@ -79,13 +79,16 @@ export async function listarPlanes(): Promise<PlanRecord[]> {
 
 export async function getGatewaysConfig(): Promise<GatewaysConfig> {
   const stored = await pgDataStore.getPlatformSetting<Partial<GatewaysConfig>>('payment_gateways');
-  if (!stored) return DEFAULT_GATEWAYS;
   return {
-    pasarelaActiva: stored.pasarelaActiva || 'sandbox',
-    onvopay: { ...DEFAULT_GATEWAYS.onvopay, ...(stored.onvopay || {}) },
-    tilopay: { ...DEFAULT_GATEWAYS.tilopay, ...(stored.tilopay || {}) },
-    stripe: { ...DEFAULT_GATEWAYS.stripe, ...(stored.stripe || {}) },
-    sinpe: { ...DEFAULT_GATEWAYS.sinpe, ...(stored.sinpe || {}) }
+    pasarelaActiva: stored?.pasarelaActiva || (process.env.DEFAULT_GATEWAY as any) || DEFAULT_GATEWAYS.pasarelaActiva,
+    onvopay: {
+      publicKey: process.env.ONVO_PUBLIC_KEY || stored?.onvopay?.publicKey || DEFAULT_GATEWAYS.onvopay.publicKey,
+      secretKey: process.env.ONVO_SECRET_KEY || stored?.onvopay?.secretKey || DEFAULT_GATEWAYS.onvopay.secretKey,
+      webhookSecret: process.env.ONVO_WEBHOOK_SECRET || stored?.onvopay?.webhookSecret || DEFAULT_GATEWAYS.onvopay.webhookSecret
+    },
+    tilopay: { ...DEFAULT_GATEWAYS.tilopay, ...(stored?.tilopay || {}) },
+    stripe: { ...DEFAULT_GATEWAYS.stripe, ...(stored?.stripe || {}) },
+    sinpe: { ...DEFAULT_GATEWAYS.sinpe, ...(stored?.sinpe || {}) }
   };
 }
 
@@ -271,24 +274,22 @@ export async function requireFeatureImap(req: Request, res: Response, next: Next
   }
 }
 
-const ONVO_DIRECT_LINKS: Record<string, { monthly: string; yearly: string }> = {
-  emprendedor: {
-    monthly: 'https://buy.onvopay.com/test_pC5GcXnzWE_dpFkf_sn-TeVb3rc',
-    yearly: 'https://buy.onvopay.com/test_Cr8_67VpCxoK70do1_k_QW1unfc'
-  },
-  pro: {
-    monthly: 'https://buy.onvopay.com/test_6VzVdGxPh2TIawOt39IjUVjZcYA',
-    yearly: 'https://buy.onvopay.com/test_jQyRWv_oM8LPxmu_8ghFWrQ_FXE'
-  },
-  profesional: {
-    monthly: 'https://buy.onvopay.com/test_6VzVdGxPh2TIawOt39IjUVjZcYA',
-    yearly: 'https://buy.onvopay.com/test_jQyRWv_oM8LPxmu_8ghFWrQ_FXE'
-  },
-  empresarial: {
-    monthly: 'https://buy.onvopay.com/test_Fo5VyQvXf4p2KhE0f5yUX7aDhh8',
-    yearly: 'https://buy.onvopay.com/test_UVtR8I-9TQH-zxIYZlrh5B7m1ZM'
+export function isSandboxPermitted(): boolean {
+  // En producción (NODE_ENV === 'production' o base de datos de producción),
+  // el modo sandbox está estrictamente deshabilitado para todos los usuarios (incluido SuperAdmin).
+  if (process.env.NODE_ENV === 'production') {
+    return false;
   }
-};
+  const dbUrl = process.env.DATABASE_URL || '';
+  if (dbUrl.includes('/facturacion_saas')) {
+    return false;
+  }
+  return (
+    process.env.NODE_ENV === 'test' ||
+    process.env.NODE_ENV === 'development' ||
+    process.env.ALLOW_SANDBOX_CHECKOUT === 'true'
+  );
+}
 
 export async function iniciarCheckoutRecurrente(
   tenantId: string,
@@ -308,40 +309,65 @@ export async function iniciarCheckoutRecurrente(
 
   const gateways = await getGatewaysConfig();
   const requested = providerOverride || gateways.pasarelaActiva || 'sandbox';
-  let provider = requested;
+  const provider = requested;
 
-  // Si se solicita Onvo Pay y existe enlace directo de checkout, utilizarlo inmediatamente
-  const onvoDirectUrl = ONVO_DIRECT_LINKS[plan.code]?.[billingCycle];
-  if ((provider === 'onvopay' || provider === 'sandbox') && onvoDirectUrl && providerOverride === 'onvopay') {
-    const txId = crypto.randomUUID();
-    await pool.query(
-      `INSERT INTO payment_transactions (id, tenant_id, subscription_id, plan_code, billing_cycle, amount_usd, currency, provider, status, provider_reference)
-       VALUES ($1, $2, $3, $4, $5, $6, 'USD', 'onvopay', 'pending', $7)`,
-      [txId, tenantId, subscriptionId, plan.code, billingCycle, amountUsd, onvoDirectUrl]
-    );
-    return {
-      mode: 'redirect',
-      provider: 'onvopay',
-      transactionId: txId,
-      checkoutUrl: onvoDirectUrl,
-      amountUsd,
-      planNombre: plan.nombre,
-      billingCycle
-    };
+  // 1. Validación estricta de pasarelas reales: rechazo explícito si faltan credenciales (cero degradación silenciosa a sandbox)
+  if (provider === 'onvopay' && !gateways.onvopay.secretKey) {
+    throw new Error('La pasarela de pago Onvo Pay no se encuentra configurada en el sistema. Contacte al administrador.');
+  }
+  if (provider === 'stripe' && !gateways.stripe.secretKey) {
+    throw new Error('La pasarela de pago Stripe no se encuentra configurada en el sistema. Contacte al administrador.');
+  }
+  if (provider === 'tilopay' && (!gateways.tilopay.apiKey || !gateways.tilopay.apiUser)) {
+    throw new Error('La pasarela de pago Tilopay no se encuentra configurada en el sistema. Contacte al administrador.');
   }
 
-  if (provider === 'stripe' && !gateways.stripe.secretKey) provider = 'sandbox';
-  if (provider === 'onvopay' && !gateways.onvopay.secretKey) provider = 'sandbox';
-  if (provider === 'tilopay' && (!gateways.tilopay.apiKey || !gateways.tilopay.apiUser)) provider = 'sandbox';
+  // 2. Validación de modo Sandbox: estrictamente prohibido en producción; en otros entornos solo si pasarelaActiva es 'sandbox'
+  if (provider === 'sandbox') {
+    if (!isSandboxPermitted() || gateways.pasarelaActiva !== 'sandbox') {
+      throw new Error('El modo de pago de pruebas (sandbox) está inhabilitado en este entorno de producción.');
+    }
+  }
 
-  const txId = crypto.randomUUID();
-  await pool.query(
-    `INSERT INTO payment_transactions (id, tenant_id, subscription_id, plan_code, billing_cycle, amount_usd, currency, provider, status)
-     VALUES ($1, $2, $3, $4, $5, $6, 'USD', $7, 'pending')`,
-    [txId, tenantId, subscriptionId, plan.code, billingCycle, amountUsd, provider]
-  );
+  // FASE 3 y 4: Bloqueo consultivo de concurrencia y control de doble clic para ONVO.
+  // Protege a nivel de base de datos para que solicitudes HTTP estrictamente simultáneas de la misma empresa
+  // no creen transacciones ni sesiones duplicadas para la misma intención de compra.
+  let txId: string;
+  if (provider === 'onvopay') {
+    txId = await withTransaction(async (client) => {
+      // Serializar solicitudes concurrentes para el mismo tenant
+      await client.query(`SELECT pg_advisory_xact_lock(hashtext('checkout_' || $1))`, [tenantId]);
 
-  const appUrl = (process.env.PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/+$/, '');
+      const existingPending = await client.query(
+        `SELECT id FROM payment_transactions
+         WHERE tenant_id = $1 AND plan_code = $2 AND billing_cycle = $3 AND provider = 'onvopay' AND status = 'pending'
+           AND checkout_session_id IS NULL AND created_at > NOW() - INTERVAL '3 minutes'
+         ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
+        [tenantId, plan.code, billingCycle]
+      );
+
+      if (existingPending.rowCount && existingPending.rowCount > 0) {
+        return existingPending.rows[0].id;
+      }
+
+      const newId = crypto.randomUUID();
+      await client.query(
+        `INSERT INTO payment_transactions (id, tenant_id, subscription_id, plan_code, billing_cycle, amount_usd, currency, provider, status)
+         VALUES ($1, $2, $3, $4, $5, $6, 'USD', $7, 'pending')`,
+        [newId, tenantId, subscriptionId, plan.code, billingCycle, amountUsd, provider]
+      );
+      return newId;
+    });
+  } else {
+    txId = crypto.randomUUID();
+    await pool.query(
+      `INSERT INTO payment_transactions (id, tenant_id, subscription_id, plan_code, billing_cycle, amount_usd, currency, provider, status)
+       VALUES ($1, $2, $3, $4, $5, $6, 'USD', $7, 'pending')`,
+      [txId, tenantId, subscriptionId, plan.code, billingCycle, amountUsd, provider]
+    );
+  }
+
+  const appUrl = (process.env.PUBLIC_APP_URL || process.env.APP_URL || 'https://test-facturacion.meetinlabs.com').replace(/\/+$/, '');
 
   if (provider === 'stripe' && gateways.stripe.secretKey) {
     const body = new URLSearchParams({
@@ -384,31 +410,81 @@ export async function iniciarCheckoutRecurrente(
   }
 
   if (provider === 'onvopay' && gateways.onvopay.secretKey) {
-    const onvoRes = await fetch('https://api.onvopay.com/v1/payment-intents', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${gateways.onvopay.secretKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        amount: Math.round(amountUsd * 100),
-        currency: 'USD',
-        description: `${plan.nombre} (${billingCycle === 'yearly' ? 'Anual' : 'Mensual'})`,
-        metadata: { transactionId: txId, tenantId, planCode: plan.code, billingCycle }
-      })
-    });
-    const onvoJson: any = await onvoRes.json();
-    if (!onvoRes.ok) {
-      throw new Error(onvoJson?.message || 'Error creando cobro en Onvo Pay.');
+    const userRes = await pool.query(
+      `SELECT email FROM users WHERE tenant_id = $1 ORDER BY created_at ASC LIMIT 1`,
+      [tenantId]
+    );
+    const customerEmail = userRes.rows[0]?.email || undefined;
+    const amountInCents = Math.round(amountUsd * 100);
+
+    const onvoPayload = {
+      lineItems: [
+        {
+          quantity: 1,
+          unitAmount: amountInCents,
+          currency: 'USD',
+          description: `MeetinFact - ${plan.nombre} (${billingCycle === 'yearly' ? 'Anual' : 'Mensual'})`
+        }
+      ],
+      customerEmail,
+      redirectUrl: `${appUrl}/?billing=pending_confirmation&tx=${txId}`,
+      cancelUrl: `${appUrl}/?billing=cancel&tx=${txId}`,
+      metadata: {
+        transactionId: txId,
+        tenantId,
+        planCode: plan.code,
+        billingCycle
+      }
+    };
+
+    let onvoRes: any;
+    let onvoJson: any;
+    try {
+      onvoRes = await fetch('https://api.onvopay.com/v1/checkout/sessions/one-time-link', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${gateways.onvopay.secretKey}`,
+          'Content-Type': 'application/json',
+          'Idempotency-Key': txId
+        },
+        body: JSON.stringify(onvoPayload)
+      });
+      onvoJson = await onvoRes.json();
+    } catch (netErr: any) {
+      // FASE 4: Ante error de red o timeout, NO marcar prematuramente como failed.
+      // Se conserva la transacción en pending con una nota informativa, permitiendo
+      // que el webhook de ONVO la concilie si la sesión llegó a crearse externamente.
+      await pool.query(
+        `UPDATE payment_transactions
+         SET comprobante_notas = $2
+         WHERE id = $1`,
+        [txId, `Error de conexión con Onvo Pay: ${netErr.message}. Conservada en pending para reconciliación.`]
+      );
+      throw new Error(`Error de comunicación temporal con la pasarela Onvo Pay. Transacción retenida para reconciliación.`);
     }
-    await pool.query('UPDATE payment_transactions SET provider_reference = $2 WHERE id = $1', [txId, onvoJson.id || null]);
+
+    if (!onvoRes.ok || !onvoJson?.url || !onvoJson?.id) {
+      const errMsg = onvoJson?.message || 'Respuesta inválida o incompleta de Onvo Pay.';
+      await pool.query(
+        `UPDATE payment_transactions
+         SET status = 'failed', comprobante_notas = $2
+         WHERE id = $1`,
+        [txId, `Error ONVO API: ${errMsg}`]
+      );
+      throw new Error(`Error al crear la sesión de pago en Onvo Pay: ${errMsg}`);
+    }
+
+    await pool.query(
+      `UPDATE payment_transactions SET checkout_session_id = $2 WHERE id = $1`,
+      [txId, onvoJson.id]
+    );
+
     return {
-      mode: onvoJson.checkoutUrl ? 'redirect' : 'onvopay_intent',
+      mode: 'redirect',
       provider: 'onvopay',
       transactionId: txId,
-      checkoutUrl: onvoJson.checkoutUrl || onvoJson.url || null,
-      clientSecret: onvoJson.clientSecret || null,
-      publicKey: gateways.onvopay.publicKey,
+      checkoutUrl: onvoJson.url,
+      checkoutSessionId: onvoJson.id,
       amountUsd,
       planNombre: plan.nombre,
       billingCycle
@@ -650,6 +726,199 @@ export async function reportarPagoSinpe(
   return { id: txId, status: 'pending', amountUsd, referencia };
 }
 
+export interface OnvoWebhookEventData {
+  eventType: string;
+  sessionId?: string;
+  paymentIntentId?: string;
+  status?: string;
+  paymentStatus?: string;
+  tenantId?: string;
+  planCode?: string;
+  billingCycle?: string;
+  amountInCents?: number;
+  currency?: string;
+}
+
+export async function confirmarPagoOnvo(
+  transactionId: string,
+  eventData: OnvoWebhookEventData
+) {
+  return await withTransaction(async (client) => {
+    // 1. Bloquear y consultar transacción interna
+    const txRes = await client.query(
+      `SELECT *
+       FROM payment_transactions
+       WHERE id = $1
+       FOR UPDATE`,
+      [transactionId]
+    );
+
+    if (txRes.rowCount !== 1) {
+      throw new Error(`Transacción de pago no encontrada: ${transactionId}`);
+    }
+
+    const tx = txRes.rows[0];
+
+    // 2. Validación de proveedor
+    if (tx.provider !== 'onvopay') {
+      throw new Error(`El proveedor de la transacción (${tx.provider}) no es onvopay.`);
+    }
+
+    // 3. Idempotencia: si ya fue confirmada, retornar sin re-extender vigencia
+    if (tx.status === 'paid') {
+      return {
+        alreadyPaid: true,
+        tenantId: tx.tenant_id,
+        planCode: tx.plan_code
+      };
+    }
+
+    // 4. Estado interno debe ser pending
+    if (tx.status !== 'pending') {
+      throw new Error(`No se puede confirmar una transacción en estado '${tx.status}'.`);
+    }
+
+    // 5. Certificación rigurosa de fondos efectivamente cobrados (FASE 3)
+    // Para checkout_session: paymentStatus DEBE certificar 'paid'.
+    // Para payment_intent: status DEBE ser 'succeeded' o 'paid'.
+    const statusNorm = (eventData.status || '').toLowerCase();
+    const paymentStatusNorm = (eventData.paymentStatus || '').toLowerCase();
+
+    let isFundCollected = false;
+    if (eventData.eventType.includes('payment') && (statusNorm === 'succeeded' || statusNorm === 'paid')) {
+      isFundCollected = true;
+    } else if (eventData.eventType.includes('checkout')) {
+      if (paymentStatusNorm === 'paid') {
+        isFundCollected = true;
+      } else if (paymentStatusNorm !== 'unpaid' && (statusNorm === 'paid' || statusNorm === 'succeeded')) {
+        isFundCollected = true;
+      }
+    }
+
+    if (!isFundCollected) {
+      throw new Error(`El evento ONVO ('${eventData.status}', paymentStatus: '${eventData.paymentStatus}') no demuestra un cobro efectivamente pagado (fondos no confirmados o retenidos).`);
+    }
+
+    // 6. Coincidencia estricta de empresa
+    if (eventData.tenantId && eventData.tenantId !== tx.tenant_id) {
+      throw new Error(`Discrepancia de empresa: el evento pertenece a ${eventData.tenantId} pero la transacción a ${tx.tenant_id}.`);
+    }
+
+    // 7. Coincidencia de plan y ciclo
+    if (eventData.planCode && eventData.planCode !== tx.plan_code) {
+      throw new Error(`Discrepancia de plan: esperado ${tx.plan_code}, recibido ${eventData.planCode}.`);
+    }
+    if (eventData.billingCycle && eventData.billingCycle !== tx.billing_cycle) {
+      throw new Error(`Discrepancia de ciclo: esperado ${tx.billing_cycle}, recibido ${eventData.billingCycle}.`);
+    }
+
+    // 8. Coincidencia de importe y moneda
+    if (eventData.amountInCents !== undefined && eventData.amountInCents !== null) {
+      const expectedCents = Math.round(Number(tx.amount_usd) * 100);
+      if (expectedCents !== Number(eventData.amountInCents)) {
+        throw new Error(`Discrepancia de importe: esperado ${expectedCents} centavos, recibido ${eventData.amountInCents}.`);
+      }
+    }
+    if (eventData.currency) {
+      if (tx.currency.toUpperCase() !== eventData.currency.toUpperCase()) {
+        throw new Error(`Discrepancia de moneda: esperada ${tx.currency}, recibida ${eventData.currency}.`);
+      }
+    }
+
+    // 9. Referencia externa de checkout verificable
+    if (eventData.sessionId) {
+      if (tx.checkout_session_id && tx.checkout_session_id !== eventData.sessionId) {
+        throw new Error(`Referencia de checkout contradictoria: registrada ${tx.checkout_session_id}, recibida ${eventData.sessionId}.`);
+      }
+    }
+
+    // 10. Referencia de cobro / Payment Intent verificable y único
+    const paymentRef = eventData.paymentIntentId || eventData.sessionId;
+    if (!paymentRef) {
+      throw new Error('El evento de ONVO no incluye una referencia válida de cobro o sesión.');
+    }
+
+    if (eventData.paymentIntentId) {
+      const duplicateIntent = await client.query(
+        `SELECT id FROM payment_transactions WHERE payment_intent_id = $1 AND id <> $2`,
+        [eventData.paymentIntentId, transactionId]
+      );
+      if (duplicateIntent.rowCount && duplicateIntent.rowCount > 0) {
+        throw new Error(`El Payment Intent ${eventData.paymentIntentId} ya fue utilizado en otra transacción.`);
+      }
+    }
+
+    // 11. Bloquear y validar suscripción de la empresa
+    const subRes = await client.query(
+      `SELECT *
+       FROM subscriptions
+       WHERE tenant_id = $1
+       FOR UPDATE`,
+      [tx.tenant_id]
+    );
+
+    if (subRes.rowCount !== 1) {
+      throw new Error('No existe una suscripción válida para esta empresa.');
+    }
+
+    const sub = subRes.rows[0];
+
+    const now = new Date();
+    let inicio = now;
+    if (sub.status === 'active' && sub.plan_code === tx.plan_code) {
+      const actualFin = new Date(sub.current_period_end);
+      if (actualFin > now) {
+        inicio = actualFin;
+      }
+    }
+
+    const dias = tx.billing_cycle === 'yearly' ? 365 : 30;
+    const fin = new Date(inicio.getTime() + dias * 86400_000);
+
+    const updateSubRes = await client.query(
+      `UPDATE subscriptions
+       SET plan_code = $2,
+           status = 'active',
+           billing_cycle = $3,
+           current_period_start = $4,
+           current_period_end = $5,
+           next_billing_date = $5,
+           provider = 'onvopay',
+           cancel_at_period_end = FALSE,
+           updated_at = NOW()
+       WHERE id = $1 AND tenant_id = $6`,
+      [sub.id, tx.plan_code, tx.billing_cycle, inicio, fin, tx.tenant_id]
+    );
+
+    if (updateSubRes.rowCount !== 1) {
+      throw new Error('Fallo de integridad al actualizar la suscripción.');
+    }
+
+    // 12. Actualizar transacción de pago
+    const updateTxRes = await client.query(
+      `UPDATE payment_transactions
+       SET status = 'paid',
+           paid_at = NOW(),
+           provider_reference = COALESCE($2, provider_reference),
+           checkout_session_id = COALESCE(checkout_session_id, $3),
+           payment_intent_id = COALESCE($4, payment_intent_id)
+       WHERE id = $1 AND status = 'pending'`,
+      [transactionId, paymentRef, eventData.sessionId || null, eventData.paymentIntentId || null]
+    );
+
+    if (updateTxRes.rowCount !== 1) {
+      throw new Error('Fallo de integridad al confirmar el pago en la transacción.');
+    }
+
+    return {
+      alreadyPaid: false,
+      tenantId: tx.tenant_id,
+      planCode: tx.plan_code,
+      periodEnd: fin
+    };
+  });
+}
+
 export async function procesarWebhook(provider: string, body: any) {
   if (provider === 'stripe') {
     const type = body?.type;
@@ -685,12 +954,107 @@ export async function procesarWebhook(provider: string, body: any) {
   }
 
   if (provider === 'onvopay') {
-    const txId = body?.data?.metadata?.transactionId || body?.metadata?.transactionId;
-    const event = String(body?.type || body?.event || '').replace(/_/g, '-');
-    if (txId && event === 'payment-intent.succeeded') {
-      await completarPagoYActivarSuscripcion(txId, 'onvopay', body?.data?.id || body?.id);
+    const rawType = String(body?.type || body?.event || '');
+    const normalizedType = rawType.replace(/_/g, '-').toLowerCase();
+
+    // Eventos soportados para confirmación
+    const isCheckoutSuccess = (
+      normalizedType === 'checkout-session.succeeded' ||
+      normalizedType === 'checkout-session-succeeded' ||
+      normalizedType === 'checkout-session.completed' ||
+      normalizedType === 'checkout-session-completed'
+    );
+    const isPaymentIntentSuccess = (normalizedType === 'payment-intent.succeeded' || normalizedType === 'payment-intent-succeeded');
+
+    if (!isCheckoutSuccess && !isPaymentIntentSuccess) {
+      if (normalizedType.includes('failed') || normalizedType.includes('canceled')) {
+        const obj = body?.data?.object || body?.data || {};
+        const txId = obj?.metadata?.transactionId || body?.metadata?.transactionId;
+        if (txId) {
+          await pool.query(
+            `UPDATE payment_transactions SET status = 'failed', comprobante_notas = $2 WHERE id = $1 AND status = 'pending'`,
+            [txId, `Evento ONVO de cancelación/fallo: ${rawType}`]
+          );
+        }
+      }
+      return { received: true, ignored: true, reason: `Evento no accionable: ${rawType}` };
     }
-    return { received: true };
+
+    const obj = body?.data?.object || body?.data || {};
+    const metadata = obj?.metadata || body?.metadata || {};
+
+    let transactionId = metadata.transactionId;
+    let sessionId: string | undefined;
+    let paymentIntentId: string | undefined;
+    let status = String(obj.status || (isCheckoutSuccess ? 'completed' : 'succeeded')).toLowerCase();
+    let paymentStatus = String(obj.paymentStatus || obj.payment_status || '').toLowerCase();
+    let amountInCents: number | undefined;
+    let currency: string | undefined = obj.currency || obj.lineItems?.[0]?.currency;
+
+    if (isCheckoutSuccess) {
+      sessionId = obj.id || body?.data?.id;
+      paymentIntentId = obj.paymentIntent || obj.payment_intent || obj.paymentIntentId || undefined;
+      amountInCents = obj.amountTotal ?? obj.amount_total ?? obj.amount ?? obj.lineItems?.[0]?.unitAmount;
+      if (!paymentStatus && (status === 'paid' || status === 'succeeded')) {
+        paymentStatus = 'paid';
+      }
+    } else if (isPaymentIntentSuccess) {
+      paymentIntentId = obj.id || body?.data?.id;
+      amountInCents = obj.amount;
+      paymentStatus = (status === 'succeeded' || status === 'paid') ? 'paid' : paymentStatus;
+    }
+
+    // Búsqueda por checkout_session_id si no vino en metadata
+    if (!transactionId && sessionId) {
+      const lookup = await pool.query(
+        `SELECT id FROM payment_transactions WHERE checkout_session_id = $1 LIMIT 1`,
+        [sessionId]
+      );
+      if (lookup.rowCount) {
+        transactionId = lookup.rows[0].id;
+      }
+    }
+
+    if (!transactionId) {
+      console.warn('[ONVO WEBHOOK] Evento recibido sin transactionId identificable.');
+      return { received: true, ignored: true, error: 'transactionId no identificado' };
+    }
+
+    // FASE 3: Si es una sesión de checkout y paymentStatus no indica 'paid' (por ejemplo está en 'unpaid' o ausente),
+    // consultar la API oficial de ONVO para verificar si los fondos están efectivamente cobrados antes de activar.
+    if (isCheckoutSuccess && paymentStatus !== 'paid' && status !== 'paid' && status !== 'succeeded') {
+      const gateways = await getGatewaysConfig();
+      if (gateways.onvopay.secretKey && sessionId) {
+        try {
+          const verifyRes = await fetch(`https://api.onvopay.com/v1/checkout/sessions/${sessionId}`, {
+            headers: { Authorization: `Bearer ${gateways.onvopay.secretKey}` }
+          });
+          if (verifyRes.ok) {
+            const sessionData: any = await verifyRes.json();
+            status = String(sessionData.status || status).toLowerCase();
+            paymentStatus = String(sessionData.paymentStatus || sessionData.payment_status || paymentStatus).toLowerCase();
+            paymentIntentId = sessionData.paymentIntent || sessionData.payment_intent || paymentIntentId;
+          }
+        } catch (fetchErr: any) {
+          console.warn('[ONVO WEBHOOK] Error consultando API ONVO para verificación de sesión:', fetchErr.message);
+        }
+      }
+    }
+
+    const result = await confirmarPagoOnvo(transactionId, {
+      eventType: rawType,
+      sessionId,
+      paymentIntentId,
+      status,
+      paymentStatus,
+      tenantId: metadata.tenantId,
+      planCode: metadata.planCode,
+      billingCycle: metadata.billingCycle,
+      amountInCents: amountInCents !== undefined ? Number(amountInCents) : undefined,
+      currency
+    });
+
+    return { received: true, ...result };
   }
 
   if (provider === 'tilopay') {
@@ -702,6 +1066,74 @@ export async function procesarWebhook(provider: string, body: any) {
   }
 
   return { received: true };
+}
+
+// FASE 4: Conciliación activa de transacciones pendientes inciertas
+export async function conciliarTransaccionesOnvoPendientes() {
+  const gateways = await getGatewaysConfig();
+  if (!gateways.onvopay.secretKey) {
+    return { reconciled: 0, reason: 'ONVO secretKey no configurada' };
+  }
+
+  // Buscar transacciones ONVO pendientes con antigüedad entre 15 minutos y 24 horas
+  const pendingTxRes = await pool.query(
+    `SELECT id, checkout_session_id, tenant_id, plan_code, billing_cycle, amount_usd, currency, created_at
+     FROM payment_transactions
+     WHERE provider = 'onvopay' AND status = 'pending'
+       AND created_at < NOW() - INTERVAL '15 minutes'
+       AND created_at > NOW() - INTERVAL '24 hours'
+     ORDER BY created_at ASC LIMIT 50`
+  );
+
+  let reconciledCount = 0;
+  for (const tx of pendingTxRes.rows) {
+    if (tx.checkout_session_id) {
+      try {
+        const res = await fetch(`https://api.onvopay.com/v1/checkout/sessions/${tx.checkout_session_id}`, {
+          headers: { Authorization: `Bearer ${gateways.onvopay.secretKey}` }
+        });
+        if (res.ok) {
+          const session: any = await res.json();
+          const paymentStatus = String(session.paymentStatus || session.payment_status || '').toLowerCase();
+          const sessionStatus = String(session.status || '').toLowerCase();
+
+          if (paymentStatus === 'paid' || sessionStatus === 'paid' || sessionStatus === 'succeeded') {
+            await confirmarPagoOnvo(tx.id, {
+              eventType: 'checkout_session.reconciliation',
+              sessionId: tx.checkout_session_id,
+              paymentIntentId: session.paymentIntent || session.payment_intent || session.paymentIntentId,
+              status: sessionStatus || 'completed',
+              paymentStatus: 'paid',
+              tenantId: tx.tenant_id,
+              planCode: tx.plan_code,
+              billingCycle: tx.billing_cycle,
+              amountInCents: Math.round(Number(tx.amount_usd) * 100),
+              currency: tx.currency
+            });
+            reconciledCount++;
+          } else if (sessionStatus === 'expired') {
+            await pool.query(
+              `UPDATE payment_transactions SET status = 'failed', comprobante_notas = 'Sesión ONVO expirada sin pago durante conciliación' WHERE id = $1 AND status = 'pending'`,
+              [tx.id]
+            );
+          }
+        }
+      } catch (err: any) {
+        console.warn(`[RECONCILIACIÓN ONVO] Error consultando sesión ${tx.checkout_session_id}:`, err.message);
+      }
+    } else {
+      // Sin sesión externa y con más de 1 hora de antigüedad: descartar
+      const ageMinutes = (Date.now() - new Date(tx.created_at).getTime()) / 60000;
+      if (ageMinutes > 60) {
+        await pool.query(
+          `UPDATE payment_transactions SET status = 'failed', comprobante_notas = 'Sesión ONVO nunca establecida; cerrada por tiempo límite' WHERE id = $1 AND status = 'pending'`,
+          [tx.id]
+        );
+      }
+    }
+  }
+
+  return { reconciled: reconciledCount, evaluated: pendingTxRes.rowCount };
 }
 
 // FUNCIONES SUPERADMIN SAAS

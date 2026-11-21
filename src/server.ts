@@ -66,13 +66,15 @@ import {
   actualizarEstadoTenant,
   saveGatewaysConfig,
   getGatewaysConfig,
+  isSandboxPermitted,
   verificarVencimientosSuscripciones
 } from './services/billing-service.js';
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
+const HOST = process.env.HOST || '127.0.0.1';
 
 app.use(cors({ origin: true, credentials: true }));
 // Permitir payloads Base64 para logos y certificados de hasta 15MB, guardando rawBody para firmas de webhooks
@@ -430,7 +432,7 @@ function esTimestampValido(tsRaw: string | number, maxDiffSegundos = 300): boole
   return Math.abs(ahoraSegundos - tsSegundos) <= maxDiffSegundos;
 }
 
-function verificarFirmaWebhook(
+export function verificarFirmaWebhook(
   provider: string,
   secretEsperado: string,
   req: Request
@@ -591,8 +593,13 @@ app.post('/api/billing/webhook/:provider', ah(async (req, res) => {
     return res.status(401).json({ success: false, error: 'Firma de webhook inválida.' });
   }
 
-  const result = await procesarWebhook(provider, req.body);
-  res.json({ success: true, ...result });
+  try {
+    const result = await procesarWebhook(provider, req.body);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    console.error(`[WEBHOOK ${provider}] Error procesando webhook:`, err.message);
+    res.status(400).json({ success: false, error: err.message });
+  }
 }));
 
 // A partir de aquí todas las rutas /api requieren sesión
@@ -624,11 +631,37 @@ app.post('/api/billing/checkout', requireAdmin, ah(async (req, res) => {
 
 // Confirmación de pago en modo sandbox (pruebas sin pasarela real)
 app.post('/api/billing/sandbox/confirmar', requireAdmin, ah(async (req, res) => {
-  const txId = String(req.body?.transactionId || '');
-  const tx = await pool.query('SELECT tenant_id, provider FROM payment_transactions WHERE id = $1', [txId]);
-  if (!tx.rowCount || tx.rows[0].tenant_id !== tid(req) || tx.rows[0].provider !== 'sandbox') {
+  if (!isSandboxPermitted()) {
+    return res.status(403).json({
+      success: false,
+      error: 'La confirmación de pagos sandbox está estrictamente inhabilitada en el entorno de producción.'
+    });
+  }
+
+  const txId = String(req.body?.transactionId || '').trim();
+  if (!txId) {
+    return res.status(400).json({ success: false, error: 'transactionId requerido.' });
+  }
+
+  const tx = await pool.query('SELECT tenant_id, provider, status FROM payment_transactions WHERE id = $1', [txId]);
+  if (!tx.rowCount || tx.rows[0].tenant_id !== tid(req)) {
     return res.status(404).json({ success: false, error: 'Transacción sandbox no encontrada.' });
   }
+
+  if (tx.rows[0].provider !== 'sandbox') {
+    return res.status(400).json({
+      success: false,
+      error: 'No se puede confirmar una transacción de pasarela real mediante el endpoint sandbox.'
+    });
+  }
+
+  if (tx.rows[0].status !== 'pending') {
+    return res.status(400).json({
+      success: false,
+      error: `La transacción no se encuentra pendiente (estado: ${tx.rows[0].status}).`
+    });
+  }
+
   const result = await completarPagoYActivarSuscripcion(
     txId,
     'sandbox',
@@ -1603,10 +1636,10 @@ async function bootstrap(): Promise<void> {
   await migrarDatosJsonSiEsNecesario();
   await verificarVencimientosSuscripciones();
 
-  app.listen(PORT, () => {
+  app.listen(PORT, HOST, () => {
     console.log(`\n======================================================`);
     console.log(`🚀 PLATAFORMA SAAS DE FACTURACIÓN ELECTRÓNICA ACTIVA`);
-    console.log(`📍 URL Local: http://localhost:${PORT}`);
+    console.log(`📍 URL Local: http://${HOST}:${PORT}`);
     console.log(`🗄  Base de datos: PostgreSQL (multi-tenant)`);
     console.log(`======================================================\n`);
   });
