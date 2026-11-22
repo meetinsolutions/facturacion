@@ -1,3 +1,11 @@
+import {
+  validarTokenAcceso,
+  registrarAuditoriaAcceso,
+  generarTokenAcceso,
+  rotarTokenAcceso
+} from './services/comprobante-token-service.js';
+import { generarPortalComprobanteHTML } from './services/portal-viewer-renderer.js';
+import { obtenerOgenerarFacturaPDF } from './services/pdf-generator.js';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -602,6 +610,171 @@ app.post('/api/billing/webhook/:provider', ah(async (req, res) => {
   }
 }));
 
+
+// ==========================================
+// PORTAL PÚBLICO SEGURO DE COMPROBANTES (INCREMENTO 1)
+// Acceso y descarga de comprobantes individuales mediante tokens opacos (256 bits)
+// ==========================================
+
+function setPortalSecurityHeaders(res: Response): void {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; script-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none';"
+  );
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+}
+
+function renderErrorComprobanteNoDisponible(res: Response): void {
+  setPortalSecurityHeaders(res);
+  res.status(404).send(`<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Comprobante no disponible - MeetinFact</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background:#f8fafc; color:#0f172a; display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px; margin:0; }
+    .card { background:#fff; border:1px solid #e2e8f0; border-radius:16px; padding:36px; max-width:440px; text-align:center; box-shadow:0 10px 25px -5px rgba(0,0,0,0.05); }
+    h1 { font-size:18px; font-weight:700; margin-bottom:8px; color:#0f172a; }
+    p { font-size:14px; color:#64748b; line-height:1.5; margin-bottom:20px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div style="font-size:36px;margin-bottom:12px;">🔒</div>
+    <h1>Comprobante no disponible</h1>
+    <p>El enlace de acceso no es válido, ha caducado o fue revocado por el emisor. Si considera que se trata de un error, comuníquese con la empresa emisora para solicitar un nuevo enlace.</p>
+  </div>
+</body>
+</html>`);
+}
+
+// Visualizador HTML web responsive
+app.get('/c/:token', ah(async (req, res) => {
+  const token = String(req.params.token || '').trim();
+  const comp = await validarTokenAcceso(token);
+
+  if (!comp) {
+    return renderErrorComprobanteNoDisponible(res);
+  }
+
+  // Registrar auditoría de visualización
+  await registrarAuditoriaAcceso({
+    tenantId: comp.tenantId,
+    clave: comp.clave,
+    tipoAccion: 'view_html',
+    ipOrigen: req.ip,
+    userAgent: req.headers['user-agent']
+  });
+
+  setPortalSecurityHeaders(res);
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  const html = await generarPortalComprobanteHTML(comp, token);
+  res.send(html);
+}));
+
+// Descarga segura del XML firmado original
+app.get('/c/:token/xml', ah(async (req, res) => {
+  const token = String(req.params.token || '').trim();
+  const comp = await validarTokenAcceso(token);
+
+  if (!comp) {
+    return renderErrorComprobanteNoDisponible(res);
+  }
+
+  // Registrar auditoría de descarga
+  await registrarAuditoriaAcceso({
+    tenantId: comp.tenantId,
+    clave: comp.clave,
+    tipoAccion: 'download_xml',
+    ipOrigen: req.ip,
+    userAgent: req.headers['user-agent']
+  });
+
+  const xmlSha256 = crypto.createHash('sha256').update(comp.xmlFirmado).digest('hex');
+
+  setPortalSecurityHeaders(res);
+  res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${comp.clave}.xml"`);
+  res.setHeader('X-Content-SHA256', xmlSha256);
+  res.send(comp.xmlFirmado);
+}));
+
+// Descarga segura del PDF oficial con caché en disco y semáforo de concurrencia
+app.get('/c/:token/pdf', ah(async (req, res) => {
+  const token = String(req.params.token || '').trim();
+  const comp = await validarTokenAcceso(token);
+
+  if (!comp) {
+    return renderErrorComprobanteNoDisponible(res);
+  }
+
+  // Registrar auditoría de descarga
+  await registrarAuditoriaAcceso({
+    tenantId: comp.tenantId,
+    clave: comp.clave,
+    tipoAccion: 'download_pdf',
+    ipOrigen: req.ip,
+    userAgent: req.headers['user-agent']
+  });
+
+  const pdfBuffer = await obtenerOgenerarFacturaPDF(comp.tenantId, comp.clave, async () => {
+    return await generarFacturaEleganteHTML({
+      clave: comp.clave,
+      consecutivo: comp.consecutivo,
+      doc: comp.docOriginalJson,
+      config: comp.emisorJson || {},
+      estilo: (comp.docOriginalJson as any)?.estilo || 'ejecutivo'
+    });
+  });
+
+  setPortalSecurityHeaders(res);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${comp.clave}.pdf"`);
+  res.setHeader('Content-Length', String(pdfBuffer.length));
+  res.send(pdfBuffer);
+}));
+
+// API pública para consumo JSON sanitizado
+app.get('/api/public/comprobante/:token', ah(async (req, res) => {
+  const token = String(req.params.token || '').trim();
+  const comp = await validarTokenAcceso(token);
+
+  if (!comp) {
+    setPortalSecurityHeaders(res);
+    return res.status(404).json({ success: false, error: 'Comprobante no disponible o enlace expirado.' });
+  }
+
+  setPortalSecurityHeaders(res);
+  res.json({
+    success: true,
+    data: {
+      clave: comp.clave,
+      consecutivo: comp.consecutivo,
+      tipoDocumento: comp.tipoDocumento,
+      fecha: comp.fecha,
+      moneda: comp.moneda,
+      total: comp.total,
+      cliente: comp.cliente,
+      estadoHacienda: comp.estadoHacienda,
+      emisor: {
+        nombre: comp.emisorJson?.emisor?.nombre || comp.docOriginalJson?.emisor?.nombre,
+        identificacion: comp.emisorJson?.emisor?.identificacion || comp.docOriginalJson?.emisor?.identificacion
+      },
+      receptor: {
+        nombre: comp.docOriginalJson?.receptor?.nombre,
+        identificacion: comp.docOriginalJson?.receptor?.identificacion
+      },
+      resumen: comp.docOriginalJson?.resumen,
+      expiraEn: comp.expiraEn
+    }
+  });
+}));
+
 // A partir de aquí todas las rutas /api requieren sesión
 app.use('/api', requireAuth);
 
@@ -1154,6 +1327,35 @@ app.get('/api/facturas/:clave/pdf', ah(async (req, res) => {
 }));
 
 // Enviar o reenviar comprobante (PDF + XML) por correo electrónico
+
+app.post('/api/facturas/:clave/token-portal', ah(async (req, res) => {
+  const clave = String(req.params.clave || '').trim();
+  const tenantId = tid(req);
+  const { rotar, diasVigencia } = req.body || {};
+
+  try {
+    let result: { rawToken: string; expiraEn: Date };
+    if (rotar) {
+      result = await rotarTokenAcceso(tenantId, clave, Number(diasVigencia) || 90);
+    } else {
+      result = await generarTokenAcceso(tenantId, clave, Number(diasVigencia) || 90);
+    }
+
+    const appUrl = (process.env.PUBLIC_APP_URL || process.env.APP_URL || 'https://test-facturacion.meetinlabs.com').replace(/\/+$/, '');
+    const urlPortal = `${appUrl}/c/${result.rawToken}`;
+
+    res.json({
+      success: true,
+      data: {
+        urlPortal,
+        expiraEn: result.expiraEn
+      }
+    });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+}));
+
 app.post('/api/facturas/:clave/enviar-correo', ah(async (req, res) => {
   const t = tid(req);
   const clave = String(req.params.clave);
