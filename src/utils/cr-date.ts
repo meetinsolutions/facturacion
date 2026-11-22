@@ -16,11 +16,32 @@ export interface FechaPartesCR {
 }
 
 /**
+ * Determina si un año calendario es bisiesto según las reglas gregorianas.
+ */
+export function esBisiesto(anio: number): boolean {
+  return (anio % 4 === 0 && anio % 100 !== 0) || (anio % 400 === 0);
+}
+
+/**
+ * Retorna la cantidad exacta de días reales para un mes y año específicos.
+ */
+export function diasEnMes(anio: number, mes: number): number {
+  if (mes === 2) return esBisiesto(anio) ? 29 : 28;
+  if ([4, 6, 9, 11].includes(mes)) return 30;
+  return 31;
+}
+
+/**
  * Obtiene los componentes de fecha y hora en la zona oficial de Costa Rica
  * mediante Intl.DateTimeFormat y formatToParts(), recuperando valores por su propiedad `type`.
+ * 
+ * NOTA DE SEGURIDAD TRIBUTARIA: Rechaza explícitamente objetos Date inválidos
+ * sin recurrir a sustituciones silenciosas por la fecha actual.
  */
 export function getFechaPartesCR(date: Date = new Date()): FechaPartesCR {
-  const d = date instanceof Date && !Number.isNaN(date.getTime()) ? date : new Date();
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    throw new Error('Fecha Date inválida proporcionada para cálculo tributario en Costa Rica.');
+  }
 
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: TIMEZONE_CR,
@@ -33,7 +54,7 @@ export function getFechaPartesCR(date: Date = new Date()): FechaPartesCR {
     hourCycle: 'h23'
   });
 
-  const parts = formatter.formatToParts(d);
+  const parts = formatter.formatToParts(date);
   const partMap: Record<string, string> = {};
   for (const p of parts) {
     if (p.type !== 'literal') {
@@ -66,6 +87,9 @@ export function getFechaPartesCR(date: Date = new Date()): FechaPartesCR {
  * Ejemplo: 2026-11-21T18:14:53-06:00
  */
 export function formatoFechaIsoCR(date: Date = new Date()): string {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    throw new Error('Fecha Date inválida para formato ISO tributario de Costa Rica.');
+  }
   const p = getFechaPartesCR(date);
   return `${p.anioCompleto}-${p.mes}-${p.dia}T${p.hora}:${p.minuto}:${p.segundo}-06:00`;
 }
@@ -111,6 +135,9 @@ export function formatoFechaLegibleCR(
  */
 export function getMesFiscalCR(date: Date | string = new Date()): string {
   const d = typeof date === 'string' ? new Date(date) : date;
+  if (Number.isNaN(d.getTime())) {
+    throw new Error('Fecha inválida para cálculo de mes fiscal en Costa Rica.');
+  }
   const p = getFechaPartesCR(d);
   return `${p.anioCompleto}-${p.mes}`;
 }
@@ -120,12 +147,12 @@ export function getMesFiscalCR(date: Date | string = new Date()): string {
  * que delimita exactamente dicho mes en la hora oficial de Costa Rica (UTC-06:00).
  * 
  * Ejemplo: '2026-11'
- * - Inicio en CR: 2026-11-01 00:00:00 CR  =>  2026-11-01 06:00:00 UTC
- * - Fin en CR:    2026-12-01 00:00:00 CR  =>  2026-12-01 06:00:00 UTC
+ * - Inicio en CR: 2026-11-01 00:00:00 CR  =>  2026-11-01 06:00:00 UTC (inclusivo)
+ * - Fin en CR:    2026-12-01 00:00:00 CR  =>  2026-12-01 06:00:00 UTC (exclusivo)
  */
 export function getRangoUtcMesFiscalCR(mesFiscal: string): { inicioUtc: Date; finUtc: Date } {
   const regex = /^(\d{4})-(\d{2})$/;
-  const match = mesFiscal.match(regex);
+  const match = String(mesFiscal || '').trim().match(regex);
   if (!match) {
     throw new Error(`Formato de mes fiscal inválido: "${mesFiscal}". Debe ser YYYY-MM.`);
   }
@@ -134,7 +161,7 @@ export function getRangoUtcMesFiscalCR(mesFiscal: string): { inicioUtc: Date; fi
   const mes = parseInt(match[2], 10);
 
   if (mes < 1 || mes > 12) {
-    throw new Error(`Mes fiscal fuera de rango (1-12): "${mesFiscal}".`);
+    throw new Error(`Mes fiscal fuera de rango (01-12): "${mesFiscal}".`);
   }
 
   const inicioIso = `${match[1]}-${match[2]}-01T06:00:00.000Z`;
@@ -157,10 +184,12 @@ export function getRangoUtcMesFiscalCR(mesFiscal: string): { inicioUtc: Date; fi
 /**
  * Convierte una fecha específica 'YYYY-MM-DD' en un rango cerrado-abierto [inicioUtc, finUtc)
  * correspondiente al día completo en Costa Rica.
+ * 
+ * Valida la existencia real del día según el calendario (incluyendo bisiestos).
  */
 export function getRangoUtcDiaCR(fechaStr: string): { inicioUtc: Date; finUtc: Date } {
   const regex = /^(\d{4})-(\d{2})-(\d{2})$/;
-  const match = fechaStr.match(regex);
+  const match = String(fechaStr || '').trim().match(regex);
   if (!match) {
     throw new Error(`Formato de fecha inválido: "${fechaStr}". Debe ser YYYY-MM-DD.`);
   }
@@ -169,9 +198,16 @@ export function getRangoUtcDiaCR(fechaStr: string): { inicioUtc: Date; finUtc: D
   const mes = parseInt(match[2], 10);
   const dia = parseInt(match[3], 10);
 
-  const inicioUtc = new Date(`${match[1]}-${match[2]}-${match[3]}T06:00:00.000Z`);
+  if (mes < 1 || mes > 12) {
+    throw new Error(`Mes inválido (${mes}) en fecha "${fechaStr}". Debe estar entre 01 y 12.`);
+  }
 
-  // Calcular día siguiente sumando 24 horas exactas en UTC
+  const maxDias = diasEnMes(anio, mes);
+  if (dia < 1 || dia > maxDias) {
+    throw new Error(`Día inválido (${dia}) para el mes ${match[2]} del año ${anio}. Máximo permitido: ${maxDias}.`);
+  }
+
+  const inicioUtc = new Date(`${match[1]}-${match[2]}-${match[3]}T06:00:00.000Z`);
   const finUtc = new Date(inicioUtc.getTime() + 24 * 3600 * 1000);
 
   return { inicioUtc, finUtc };

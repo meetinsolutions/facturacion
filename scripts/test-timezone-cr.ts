@@ -262,6 +262,83 @@ async function runAll() {
     assert.ok(legibleFin.includes('21 dic') || legibleFin.includes('21 de diciembre'));
   });
 
+  // 13. Rechazo explícito de objetos Date inválidos (sin sustitución silenciosa)
+  await test('13. Rechazo explícito de fechas inválidas para emisión tributaria (no fallback silencioso)', () => {
+    const invalidDate = new Date('fecha_invalida_no_parseable');
+    assert.ok(Number.isNaN(invalidDate.getTime()));
+
+    assert.throws(() => {
+      getFechaPartesCR(invalidDate);
+    }, /inválida/i, 'getFechaPartesCR debe arrojar error ante Date inválida');
+
+    assert.throws(() => {
+      formatoFechaIsoCR(invalidDate);
+    }, /inválida/i, 'formatoFechaIsoCR debe arrojar error ante Date inválida');
+
+    assert.throws(() => {
+      generarClave({
+        fecha: invalidDate,
+        cedulaEmisor: '3101123456',
+        consecutivo: generarConsecutivo(1, 1, '01', 500)
+      });
+    }, /inválida/i, 'generarClave debe arrojar error ante Date inválida');
+  });
+
+  // 14. Validación estricta de períodos fiscales YYYY-MM (meses entre 01 y 12)
+  await test('14. Validación de meses en períodos fiscales YYYY-MM (estrictamente 01 a 12)', () => {
+    assert.throws(() => getRangoUtcMesFiscalCR('2026-00'), /fuera de rango/i);
+    assert.throws(() => getRangoUtcMesFiscalCR('2026-13'), /fuera de rango/i);
+    assert.throws(() => getRangoUtcMesFiscalCR('2026-99'), /fuera de rango/i);
+    assert.throws(() => getRangoUtcMesFiscalCR('invalido'), /inválido/i);
+
+    const r01 = getRangoUtcMesFiscalCR('2026-01');
+    assert.strictEqual(r01.inicioUtc.toISOString(), '2026-01-01T06:00:00.000Z');
+    assert.strictEqual(r01.finUtc.toISOString(), '2026-02-01T06:00:00.000Z');
+
+    const r12 = getRangoUtcMesFiscalCR('2026-12');
+    assert.strictEqual(r12.inicioUtc.toISOString(), '2026-12-01T06:00:00.000Z');
+    assert.strictEqual(r12.finUtc.toISOString(), '2027-01-01T06:00:00.000Z');
+  });
+
+  // 15. Validación de existencia real de días y años bisiestos en YYYY-MM-DD
+  await test('15. Validación de existencia real de días y años bisiestos en getRangoUtcDiaCR', () => {
+    // 29 de febrero en año bisiesto (2024): VÁLIDO
+    const rBisiestoValido = getRangoUtcDiaCR('2024-02-29');
+    assert.strictEqual(rBisiestoValido.inicioUtc.toISOString(), '2024-02-29T06:00:00.000Z');
+    assert.strictEqual(rBisiestoValido.finUtc.toISOString(), '2024-03-01T06:00:00.000Z');
+
+    // 29 de febrero en año no bisiesto (2026): INVÁLIDO
+    assert.throws(() => getRangoUtcDiaCR('2026-02-29'), /Día inválido/i);
+
+    // 31 de abril (mes de 30 días): INVÁLIDO
+    assert.throws(() => getRangoUtcDiaCR('2026-04-31'), /Día inválido/i);
+
+    // 32 de enero: INVÁLIDO
+    assert.throws(() => getRangoUtcDiaCR('2026-01-32'), /Día inválido/i);
+
+    // Día 00: INVÁLIDO
+    assert.throws(() => getRangoUtcDiaCR('2026-01-00'), /Día inválido/i);
+  });
+
+  // 16. Verificación estricta de límites de rango cerrado-abierto [inicio, fin)
+  await test('16. Límites de rango temporal son estrictamente inclusivos al inicio y exclusivos al final', () => {
+    const rangoDia = getRangoUtcDiaCR('2026-11-21');
+    const inicioMs = rangoDia.inicioUtc.getTime();
+    const finMs = rangoDia.finUtc.getTime();
+
+    // Exactamente en el milisegundo de inicio (06:00:00.000Z): DENTRO
+    assert.ok(inicioMs >= inicioMs && inicioMs < finMs, 'El inicio exacto debe estar incluido');
+
+    // Un milisegundo antes del inicio (05:59:59.999Z): FUERA
+    assert.ok(!((inicioMs - 1) >= inicioMs && (inicioMs - 1) < finMs), 'Antes del inicio debe estar excluido');
+
+    // Un milisegundo antes del fin (05:59:59.999Z del día siguiente): DENTRO
+    assert.ok((finMs - 1) >= inicioMs && (finMs - 1) < finMs, 'Un ms antes del fin debe estar incluido');
+
+    // Exactamente en el milisegundo de fin (06:00:00.000Z del día siguiente): FUERA (exclusivo)
+    assert.ok(!(finMs >= inicioMs && finMs < finMs), 'El fin exacto debe ser excluido');
+  });
+
   console.log('\n======================================================================');
   console.log(`RESULTADO DE LA SUITE DE ZONA HORARIA: ${exitosas}/${total} PRUEBAS EXITOSAS`);
   console.log('======================================================================');

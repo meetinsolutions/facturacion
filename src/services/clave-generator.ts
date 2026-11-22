@@ -51,6 +51,10 @@ export function generarClave(params: {
   situacion?: SituacionEnvio;
   codigoSeguridad?: string;
 }): string {
+  if (!(params.fecha instanceof Date) || Number.isNaN(params.fecha.getTime())) {
+    throw new Error('La fecha proporcionada para la generación de la clave numérica es inválida.');
+  }
+
   const codigoPais = '506';
 
   const partes = getFechaPartesCR(params.fecha);
