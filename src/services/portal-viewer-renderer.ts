@@ -30,15 +30,22 @@ export async function generarPortalComprobanteHTML(
   const lineas = Array.isArray(doc.lineas) ? doc.lineas : [];
   const resumen = doc.resumen || {};
 
+  const isTest = process.env.NODE_ENV !== 'production' || 
+                 (process.env.APP_URL || '').includes('test-') || 
+                 process.env.ALLOW_SANDBOX_CHECKOUT === 'true';
+
   // 1. Estado oficial de Hacienda
   let estadoBadgeHtml = '';
   const estadoNorm = (comp.estadoHacienda || '').toLowerCase();
 
   if (estadoNorm === 'aceptado') {
+    const textoAceptado = isTest
+      ? 'Autorizado por Ministerio de Hacienda (Simulación Sandbox / QA)'
+      : 'Autorizado por Ministerio de Hacienda';
     estadoBadgeHtml = `
       <div style="display:inline-flex;align-items:center;gap:6px;background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;padding:6px 14px;border-radius:9999px;font-size:13px;font-weight:600;">
         <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-        Autorizado por Ministerio de Hacienda
+        ${textoAceptado}
       </div>`;
   } else if (estadoNorm === 'procesando') {
     estadoBadgeHtml = `
@@ -228,6 +235,12 @@ export async function generarPortalComprobanteHTML(
   </style>
 </head>
 <body>
+  ${isTest ? `
+  <div style="background:#fffbeb;border-bottom:1px solid #fde68a;color:#92400e;padding:10px 16px;text-align:center;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;">
+    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+    ENTORNO DE PRUEBAS / QA SANDBOX — DOCUMENTO SIMULADO SIN VALIDEZ TRIBUTARIA
+  </div>
+  ` : ''}
 
   <div class="container">
     <!-- Header -->
