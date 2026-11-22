@@ -14,7 +14,7 @@ import {
   hashToken
 } from '../src/services/comprobante-token-service.js';
 import { generarPortalComprobanteHTML } from '../src/services/portal-viewer-renderer.js';
-import { obtenerOgenerarFacturaPDF } from '../src/services/pdf-generator.js';
+import { obtenerOgenerarFacturaPDF, invalidarCachePDF } from '../src/services/pdf-generator.js';
 
 const TEST_DB = 'facturacion_test';
 const databaseUrl = process.env.DATABASE_URL;
@@ -50,19 +50,21 @@ async function createTenantWithComprobante(slug: string, claveSuffix = '001') {
   const clave = `50621112600310199999900100001010000000000${claveSuffix}`;
   const consecutivo = `0010000101000000000${claveSuffix}`;
 
-  await pool.query(
+  const tenantRes = await pool.query(
     `INSERT INTO tenants (id, nombre, cedula, slug, activo)
      VALUES ($1, $2, '3-101-999999', $3, TRUE)
-     ON CONFLICT (slug) DO UPDATE SET activo = TRUE`,
+     ON CONFLICT (slug) DO UPDATE SET activo = TRUE
+     RETURNING id`,
     [tenantId, `Empresa Portal ${slug}`, slug]
   );
+  const actualTenantId = tenantRes.rows[0].id;
 
   await pool.query(
     `INSERT INTO tenant_configs (tenant_id, emisor_json)
      VALUES ($1, $2)
      ON CONFLICT (tenant_id) DO UPDATE SET emisor_json = $2`,
     [
-      tenantId,
+      actualTenantId,
       JSON.stringify({
         emisor: {
           nombre: `Comercializadora ${slug} S.A.`,
@@ -115,10 +117,14 @@ async function createTenantWithComprobante(slug: string, claveSuffix = '001') {
     `INSERT INTO comprobantes (tenant_id, clave, consecutivo, tipo_documento, fecha, moneda, total, cliente, estado_hacienda, xml_firmado, doc_original_json)
      VALUES ($1, $2, $3, '01', NOW(), 'CRC', 56500.00, 'Cliente de Prueba S.A.', 'aceptado', $4, $5)
      ON CONFLICT (tenant_id, clave) DO UPDATE SET total = 56500.00, estado_hacienda = 'aceptado'`,
-    [tenantId, clave, consecutivo, xmlFirmado, JSON.stringify(docOriginal)]
+    [actualTenantId, clave, consecutivo, xmlFirmado, JSON.stringify(docOriginal)]
   );
 
-  return { tenantId, clave, consecutivo, xmlFirmado, docOriginal };
+  // Limpiar tokens residuales y auditorías de ejecuciones previas para idempotencia estricta
+  await pool.query('DELETE FROM comprobantes_tokens_acceso WHERE tenant_id = $1', [actualTenantId]);
+  await pool.query('DELETE FROM auditoria_descargas_comprobantes WHERE tenant_id = $1', [actualTenantId]);
+
+  return { tenantId: actualTenantId, clave, consecutivo, xmlFirmado, docOriginal };
 }
 
 async function run() {
@@ -363,6 +369,7 @@ async function run() {
   // ------------------------------------------------------------------
   await test('10. Descarga de PDF con caché protegida y mutex concurrente', async () => {
     const { tenantId, clave } = await createTenantWithComprobante('tkn-pdf-cache', '801');
+    invalidarCachePDF(tenantId, clave);
     let invocacionesGenerador = 0;
 
     const dummyGenerator = async () => {

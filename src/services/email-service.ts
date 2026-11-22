@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { ComprobanteGuardado, ConfiguracionSistema } from './data-store.js';
+import { formatoFechaLegibleCR } from '../utils/cr-date.js';
 
 export type ConfigCorreo = NonNullable<ConfiguracionSistema['correo']>;
 
@@ -140,10 +141,7 @@ export async function enviarComprobantePorCorreo(params: {
     maximumFractionDigits: 2
   })}`;
 
-  const fechaObj = new Date(comprobante.fecha);
-  const fechaTexto = Number.isNaN(fechaObj.getTime())
-    ? ''
-    : fechaObj.toLocaleString('es-CR', { dateStyle: 'medium', timeStyle: 'short' });
+  const fechaTexto = formatoFechaLegibleCR(comprobante.fecha);
 
   const emisorNombre = config.emisor?.nombreComercial || config.emisor?.nombre || 'Emisor';
   const clienteNombre = comprobante.cliente || 'Cliente';

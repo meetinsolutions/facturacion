@@ -1,5 +1,6 @@
 import QRCode from 'qrcode';
 import { ComprobanteElectronico } from '../types/factura.types.js';
+import { formatoFechaLegibleCR } from '../utils/cr-date.js';
 import {
   ConfiguracionSistema,
   DisenoEstiloTabla,
@@ -634,10 +635,7 @@ export async function generarFacturaEleganteHTML(data: FacturaRenderData): Promi
     doc.condicionVenta === '02' && doc.plazoCredito ? ` (${escapeHtml(doc.plazoCredito)} días)` : '';
   const mediosPagoTexto = (doc.mediosPago || ['01']).map(m => MEDIO_PAGO_LABELS[m] || 'Otros').join(', ');
 
-  const fechaObj = new Date(doc.fechaEmision);
-  const fechaFormateada = Number.isNaN(fechaObj.getTime())
-    ? ''
-    : fechaObj.toLocaleString('es-CR', { dateStyle: 'medium', timeStyle: 'short' });
+  const fechaFormateada = formatoFechaLegibleCR(doc.fechaEmision);
 
   const moneda = doc.resumen.codigoMoneda || 'CRC';
   const simboloMoneda = moneda === 'USD' ? '$' : moneda === 'EUR' ? '€' : '¢';

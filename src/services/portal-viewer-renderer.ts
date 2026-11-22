@@ -4,6 +4,7 @@
  */
 import QRCode from 'qrcode';
 import { ComprobanteAccesoValido } from './comprobante-token-service.js';
+import { formatoFechaLegibleCR } from '../utils/cr-date.js';
 
 function escapeHtml(str: any): string {
   if (str === null || str === undefined) return '';
@@ -90,13 +91,7 @@ export async function generarPortalComprobanteHTML(
   };
   const tipoDocNombre = tipoDocNombres[comp.tipoDocumento] || 'Comprobante Electrónico';
 
-  const fechaFormateada = new Date(comp.fecha).toLocaleDateString('es-CR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  const fechaFormateada = formatoFechaLegibleCR(comp.fecha, { formatoLargo: true });
 
   // Renderizar filas de la tabla de líneas
   const filasLineasHtml = lineas.map((l: any, idx: number) => `

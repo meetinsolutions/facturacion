@@ -6,6 +6,11 @@ import {
 } from './services/comprobante-token-service.js';
 import { generarPortalComprobanteHTML } from './services/portal-viewer-renderer.js';
 import { obtenerOgenerarFacturaPDF } from './services/pdf-generator.js';
+import {
+  getFechaPartesCR,
+  getRangoUtcDiaCR,
+  getRangoUtcMesFiscalCR
+} from './utils/cr-date.js';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -1393,10 +1398,14 @@ app.post('/api/facturas/:clave/enviar-correo', ah(async (req, res) => {
 }));
 
 app.get('/api/reportes/caja', ah(async (req, res) => {
-  const hoy = new Date().toISOString().split('T')[0];
-  const comprobantesHoy = (await pgDataStore.getComprobantes(tid(req))).filter(c =>
-    new Date(c.fecha).toISOString().split('T')[0] === hoy
-  );
+  const p = getFechaPartesCR(new Date());
+  const hoyCR = `${p.anioCompleto}-${p.mes}-${p.dia}`;
+  const { inicioUtc, finUtc } = getRangoUtcDiaCR(hoyCR);
+
+  const comprobantesHoy = (await pgDataStore.getComprobantes(tid(req))).filter(c => {
+    const t = new Date(c.fecha).getTime();
+    return t >= inicioUtc.getTime() && t < finUtc.getTime();
+  });
 
   const totalVentas = comprobantesHoy.reduce((acc, c) => acc + (c.total || 0), 0);
   const totalFacturas = comprobantesHoy.filter(c => c.tipoDocumento === '01').length;
@@ -1405,7 +1414,7 @@ app.get('/api/reportes/caja', ah(async (req, res) => {
   res.json({
     success: true,
     data: {
-      fecha: hoy,
+      fecha: hoyCR,
       montoApertura: 50000,
       totalVentas,
       totalEfectivoEsperado: 50000 + totalVentas,
@@ -1642,8 +1651,20 @@ app.get('/api/gastos/exportar-csv', ah(async (req, res) => {
   const categoria = String(req.query.categoria || '').trim();
   const estado = String(req.query.estado || '').trim();
 
+  let rangoMes: { inicioUtc: Date; finUtc: Date } | null = null;
+  if (mes) {
+    try {
+      rangoMes = getRangoUtcMesFiscalCR(mes);
+    } catch {
+      /* formato inválido */
+    }
+  }
+
   const items = (await pgDataStore.getGastos(tid(req))).filter(g => {
-    if (mes && !String(g.fechaEmision || '').startsWith(mes)) return false;
+    if (rangoMes && g.fechaEmision) {
+      const t = new Date(g.fechaEmision).getTime();
+      if (t < rangoMes.inicioUtc.getTime() || t >= rangoMes.finUtc.getTime()) return false;
+    }
     if (categoria && g.categoriaGasto !== categoria) return false;
     if (estado && g.estadoConfirmacion !== estado) return false;
     return true;
@@ -1696,9 +1717,21 @@ app.get('/api/gastos/reporte-html', ah(async (req, res) => {
   const estado = String(req.query.estado || '').trim();
   const busqueda = String(req.query.q || '').trim().toLowerCase();
 
+  let rangoMes: { inicioUtc: Date; finUtc: Date } | null = null;
+  if (mes) {
+    try {
+      rangoMes = getRangoUtcMesFiscalCR(mes);
+    } catch {
+      /* formato inválido */
+    }
+  }
+
   const todos = await pgDataStore.getGastos(t);
   const gastosFiltrados = todos.filter(g => {
-    if (mes && !String(g.fechaEmision || '').startsWith(mes)) return false;
+    if (rangoMes && g.fechaEmision) {
+      const tMs = new Date(g.fechaEmision).getTime();
+      if (tMs < rangoMes.inicioUtc.getTime() || tMs >= rangoMes.finUtc.getTime()) return false;
+    }
     if (categoria && g.categoriaGasto !== categoria) return false;
     if (estado && g.estadoConfirmacion !== estado) return false;
     if (busqueda) {
@@ -1729,9 +1762,21 @@ app.get('/api/gastos/reporte-pdf', ah(async (req, res) => {
   const estado = String(req.query.estado || '').trim();
   const busqueda = String(req.query.q || '').trim().toLowerCase();
 
+  let rangoMes: { inicioUtc: Date; finUtc: Date } | null = null;
+  if (mes) {
+    try {
+      rangoMes = getRangoUtcMesFiscalCR(mes);
+    } catch {
+      /* formato inválido */
+    }
+  }
+
   const todos = await pgDataStore.getGastos(t);
   const gastosFiltrados = todos.filter(g => {
-    if (mes && !String(g.fechaEmision || '').startsWith(mes)) return false;
+    if (rangoMes && g.fechaEmision) {
+      const tMs = new Date(g.fechaEmision).getTime();
+      if (tMs < rangoMes.inicioUtc.getTime() || tMs >= rangoMes.finUtc.getTime()) return false;
+    }
     if (categoria && g.categoriaGasto !== categoria) return false;
     if (estado && g.estadoConfirmacion !== estado) return false;
     if (busqueda) {

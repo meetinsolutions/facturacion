@@ -1,4 +1,5 @@
 import { TipoDocumento, SituacionEnvio } from '../types/factura.types.js';
+import { getFechaPartesCR } from '../utils/cr-date.js';
 
 /**
  * Genera el número consecutivo de 20 dígitos según la normativa DGT:
@@ -52,9 +53,10 @@ export function generarClave(params: {
 }): string {
   const codigoPais = '506';
 
-  const dia = params.fecha.getDate().toString().padStart(2, '0');
-  const mes = (params.fecha.getMonth() + 1).toString().padStart(2, '0');
-  const anio = (params.fecha.getFullYear() % 100).toString().padStart(2, '0');
+  const partes = getFechaPartesCR(params.fecha);
+  const dia = partes.dia;
+  const mes = partes.mes;
+  const anio = partes.anio;
 
   // Limpiar cédula y rellenar a 12 dígitos
   const cedulaLimpia = params.cedulaEmisor.replace(/\D/g, '').padStart(12, '0');

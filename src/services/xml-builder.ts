@@ -1,6 +1,7 @@
 import { create } from 'xmlbuilder2';
 import { ComprobanteElectronico, TipoDocumento } from '../types/factura.types.js';
 import { generarConsecutivo, generarClave } from './clave-generator.js';
+import { formatoFechaIsoCR } from '../utils/cr-date.js';
 
 /**
  * Formatea un número a un string con la cantidad especificada de decimales (DGT usa hasta 5 decimales).
@@ -11,21 +12,11 @@ export function formatoMonto(monto: number, decimales: number = 5): string {
 
 /**
  * Formatea una fecha a formato ISO 8601 con zona horaria de Costa Rica (-06:00)
+ * Requerido por la estructura XML v4.3 del Ministerio de Hacienda.
  * Ejemplo: 2026-11-19T17:05:00-06:00
  */
 export function formatoFechaCR(fecha: Date): string {
-  // Ajuste a timezone GMT-6
-  const offsetCR = -6 * 60; // en minutos
-  const fechaCR = new Date(fecha.getTime() + (fecha.getTimezoneOffset() + offsetCR) * 60000);
-
-  const YYYY = fechaCR.getFullYear();
-  const MM = String(fechaCR.getMonth() + 1).padStart(2, '0');
-  const DD = String(fechaCR.getDate()).padStart(2, '0');
-  const HH = String(fechaCR.getHours()).padStart(2, '0');
-  const mm = String(fechaCR.getMinutes()).padStart(2, '0');
-  const ss = String(fechaCR.getSeconds()).padStart(2, '0');
-
-  return `${YYYY}-${MM}-${DD}T${HH}:${mm}:${ss}-06:00`;
+  return formatoFechaIsoCR(fecha);
 }
 
 /**

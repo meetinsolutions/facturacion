@@ -2193,7 +2193,7 @@
 
     setInterval(() => {
       const now = new Date();
-      document.getElementById('reloj-digital').innerText = now.toLocaleTimeString('es-CR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      document.getElementById('reloj-digital').innerText = now.toLocaleTimeString('es-CR', { timeZone: 'America/Costa_Rica', hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' (CR)';
     }, 1000);
 
     function cambiarModulo(moduloId) {
@@ -2877,7 +2877,7 @@
         ? `<div class="${styles.logoBox}"><img src="${sitio.logoBase64}" class="max-h-12 max-w-[200px] object-contain" alt="Logo"></div>`
         : '';
 
-      const fechaStr = new Date().toLocaleString('es-CR', { dateStyle: 'medium', timeStyle: 'short' });
+      const fechaStr = new Date().toLocaleString('es-CR', { timeZone: 'America/Costa_Rica', dateStyle: 'medium', timeStyle: 'short' });
       const cliNombre = payload.cliente?.nombre || 'Cliente de Contado / General';
       const condLabel = CONDICION_VENTA_NAMES[payload.condicionVenta] || 'Contado';
       const plazoLabel = payload.condicionVenta === '02' && payload.plazoCredito ? ` (${payload.plazoCredito} días)` : '';
@@ -3534,7 +3534,7 @@
         const dt = new Date(item.fecha);
         const fechaTxt = Number.isNaN(dt.getTime())
           ? ''
-          : dt.toLocaleString('es-CR', { dateStyle: 'short', timeStyle: 'short' });
+          : dt.toLocaleString('es-CR', { timeZone: 'America/Costa_Rica', dateStyle: 'short', timeStyle: 'short' });
 
         return `
           <tr class="hover:bg-slate-50 transition">
@@ -4569,7 +4569,7 @@
             statusEl.innerText = `• Último error IMAP: ${gastosSyncMeta.ultimoError}`;
           } else if (gastosSyncMeta.ultimaSincronizacion) {
             const dt = new Date(gastosSyncMeta.ultimaSincronizacion);
-            const horaStr = Number.isNaN(dt.getTime()) ? gastosSyncMeta.ultimaSincronizacion : dt.toLocaleString('es-CR', { dateStyle: 'short', timeStyle: 'short' });
+            const horaStr = Number.isNaN(dt.getTime()) ? gastosSyncMeta.ultimaSincronizacion : dt.toLocaleString('es-CR', { timeZone: 'America/Costa_Rica', dateStyle: 'short', timeStyle: 'short' });
             statusEl.className = 'ml-1 font-semibold text-emerald-700';
             statusEl.innerText = `• Última sincronización: ${horaStr}`;
           } else {
@@ -4648,7 +4648,7 @@
 
       tbody.innerHTML = filtrados.map(g => {
         const fechaDt = new Date(g.fechaEmision);
-        const fechaTxt = Number.isNaN(fechaDt.getTime()) ? g.fechaEmision : fechaDt.toLocaleDateString('es-CR');
+        const fechaTxt = Number.isNaN(fechaDt.getTime()) ? g.fechaEmision : fechaDt.toLocaleDateString('es-CR', { timeZone: 'America/Costa_Rica' });
         const signoTexto = g.tipoDocumento === '03' ? '-' : '';
         const catOptions = [...new Set([...CATEGORIAS_GASTO, g.categoriaGasto].filter(Boolean))]
           .map(c => `<option value="${escapeHtml(c)}" ${g.categoriaGasto === c ? 'selected' : ''}>${escapeHtml(c)}</option>`)
@@ -4939,7 +4939,7 @@
       document.getElementById('gasto-det-resumen').innerHTML = `
         <div class="grid grid-cols-2 gap-2">
           <div><span class="text-slate-500">Emisor Cédula:</span> <strong class="font-mono">${escapeHtml(g.emisorCedula || 'N/D')}</strong></div>
-          <div><span class="text-slate-500">Fecha:</span> <strong>${escapeHtml(new Date(g.fechaEmision).toLocaleString('es-CR'))}</strong></div>
+          <div><span class="text-slate-500">Fecha:</span> <strong>${escapeHtml(new Date(g.fechaEmision).toLocaleString('es-CR', { timeZone: 'America/Costa_Rica' }))}</strong></div>
           <div><span class="text-slate-500">Receptor:</span> <strong>${escapeHtml(g.receptorNombre || 'N/D')} (${escapeHtml(g.receptorCedula || 'N/D')})</strong></div>
           <div><span class="text-slate-500">Moneda / T.C.:</span> <strong>${escapeHtml(g.moneda)} (¢${escapeHtml(g.tipoCambio)})</strong></div>
           <div><span class="text-slate-500">Venta Neta:</span> <strong class="font-mono">${formatMoney(g.totalVentaNeta, g.moneda)}</strong></div>
@@ -5151,7 +5151,7 @@
     let appInicializada = false;
 
     const escSaas = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-    const fmtFechaSaas = (d) => d ? new Date(d).toLocaleDateString('es-CR', { year: 'numeric', month: 'short', day: '2-digit' }) : '—';
+    const fmtFechaSaas = (d) => d ? new Date(d).toLocaleDateString('es-CR', { timeZone: 'America/Costa_Rica', year: 'numeric', month: 'short', day: '2-digit' }) : '—';
     const ESTADOS_SUS = { active: ['Activa', 'bg-emerald-100 text-emerald-700'], trialing: ['Prueba', 'bg-sky-100 text-sky-700'], past_due: ['Pago vencido', 'bg-amber-100 text-amber-700'], suspended: ['Suspendida', 'bg-rose-100 text-rose-700'], canceled: ['Cancelada', 'bg-slate-200 text-slate-600'] };
 
     // Interceptar 401 globalmente para mostrar el login

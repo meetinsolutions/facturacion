@@ -1,4 +1,5 @@
 import { GastoRecibido, ConfiguracionSistema } from './data-store.js';
+import { formatoFechaLegibleCR } from '../utils/cr-date.js';
 
 export interface ParametrosReporteGastos {
   gastos: GastoRecibido[];
@@ -153,10 +154,7 @@ export function generarReporteGastosHTML(params: ParametrosReporteGastos): strin
   const telEmpresa = config.emisor?.telefono || '';
   const logo = config.sitio?.logoBase64 || '';
 
-  const fechaGeneracion = new Date().toLocaleString('es-CR', {
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  });
+  const fechaGeneracion = formatoFechaLegibleCR(new Date());
 
   const periodoTexto = filtros.mes
     ? (() => {
@@ -864,7 +862,7 @@ export function generarReporteGastosHTML(params: ParametrosReporteGastos): strin
             const totCRC = signo * Number(g.totalCRC || (g.totalComprobante * tc));
             const ivaCRC = signo * Number(g.impuestoCRC || (g.totalImpuesto * tc));
             const subCRC = signo * Number((g.totalVentaNeta || (g.totalComprobante - g.totalImpuesto)) * tc);
-            const fDate = g.fechaEmision ? g.fechaEmision.split('T')[0] : 'N/D';
+            const fDate = g.fechaEmision ? formatoFechaLegibleCR(g.fechaEmision, { soloFecha: true, formatoCorto: true }) : 'N/D';
 
             return `
               <tr>
