@@ -185,7 +185,7 @@ async function main() {
   const { xml, clave, consecutivo } = generarXMLFactura(docFactura, Math.floor(Math.random() * 90000 + 10000));
   const signedXml = firmarXMLFactura(xml, certInfo);
 
-  // Verificación de integridad criptográfica
+  // Verificación de integridad criptográfica y perfil XAdES-EPES
   const vFirma = verificarFirmaXML(signedXml);
   if (!vFirma.valida) {
     console.error('❌ ERROR: La firma criptográfica generada no es válida.');
@@ -197,7 +197,9 @@ async function main() {
   console.log(`   - Consecutivo:     ${consecutivo}`);
   console.log(`   - Monto Total:     CRC 1,130.00`);
   console.log(`   - Namespace:       https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.4/facturaElectronica`);
-  console.log(`   - Firma XAdES-BES: VÁLIDA (RSA-SHA256, C14N, Digests OK)`);
+  console.log(`   - Firma XAdES-EPES: VÁLIDA (RSA-SHA256, C14N, Digests OK)`);
+  console.log(`   - Policy Id v4.4:   ${vFirma.policyIdValido ? 'VÁLIDO' : 'INVÁLIDO'}`);
+  console.log(`   - Policy Hash:      ${vFirma.policyDigestValido ? 'VÁLIDO' : 'INVÁLIDO'}`);
 
   // Guardar archivo preparado en carpeta de evidencia aislada
   const evidenceDir = path.join(process.cwd(), 'output', 'hacienda-staging', clave);
