@@ -1017,6 +1017,27 @@ export async function procesarWebhook(provider: string, body: any) {
     const rawType = String(body?.type || body?.event || '');
     const normalizedType = rawType.replace(/_/g, '-').toLowerCase();
 
+    // 1. Verificación estricta de entorno (anti-cruce Sandbox vs LIVE)
+    const gateways = await getGatewaysConfig();
+    const secretKey = gateways.onvopay.secretKey || '';
+    const isLiveConfigured = secretKey.includes('_live_') || secretKey.startsWith('sk_live_') || secretKey.startsWith('onvo_live_');
+    const configuredEnv = isLiveConfigured ? 'live' : 'test';
+
+    const obj = body?.data?.object || body?.data || {};
+    const metadata = obj?.metadata || body?.metadata || {};
+
+    const eventLivemode = body?.livemode !== undefined ? Boolean(body.livemode) :
+                          (obj?.livemode !== undefined ? Boolean(obj.livemode) : undefined);
+
+    if (eventLivemode !== undefined) {
+      if (configuredEnv === 'live' && !eventLivemode) {
+        throw new Error('Ambiente inválido: Se rechazó un evento de pruebas (livemode: false) porque el servidor está configurado para ONVO LIVE.');
+      }
+      if (configuredEnv === 'test' && eventLivemode) {
+        throw new Error('Ambiente inválido: Se rechazó un evento LIVE (livemode: true) porque el servidor está configurado para ONVO Sandbox.');
+      }
+    }
+
     // Eventos soportados para confirmación
     const isCheckoutSuccess = (
       normalizedType === 'checkout-session.succeeded' ||
@@ -1028,7 +1049,6 @@ export async function procesarWebhook(provider: string, body: any) {
 
     if (!isCheckoutSuccess && !isPaymentIntentSuccess) {
       if (normalizedType.includes('failed') || normalizedType.includes('canceled')) {
-        const obj = body?.data?.object || body?.data || {};
         const txId = obj?.metadata?.transactionId || body?.metadata?.transactionId;
         if (txId) {
           await pool.query(
@@ -1036,13 +1056,24 @@ export async function procesarWebhook(provider: string, body: any) {
             [txId, `Evento ONVO de cancelación/fallo: ${rawType}`]
           );
         }
+      } else if (normalizedType.includes('refund')) {
+        const pIntentId = obj.paymentIntent || obj.payment_intent || obj.id;
+        const txId = metadata.transactionId || (pIntentId ? (await pool.query('SELECT id FROM payment_transactions WHERE payment_intent_id = $1 LIMIT 1', [pIntentId])).rows[0]?.id : undefined);
+        if (txId) {
+          await pool.query(
+            `UPDATE payment_transactions SET status = 'refunded', comprobante_notas = CASE 
+               WHEN comprobante_notas IS NULL OR comprobante_notas = '' THEN $2 
+               ELSE comprobante_notas || ' | ' || $2 
+             END WHERE id = $1`,
+            [txId, `[REEMBOLSO ONVO] Evento ${rawType} registrado el ${new Date().toISOString()}`]
+          );
+          return { received: true, refunded: true, transactionId: txId };
+        }
       }
       return { received: true, ignored: true, reason: `Evento no accionable: ${rawType}` };
     }
 
-    const obj = body?.data?.object || body?.data || {};
-    const metadata = obj?.metadata || body?.metadata || {};
-
+    // Reutilizar obj y metadata ya extraídos arriba
     let transactionId = metadata.transactionId;
     let sessionId: string | undefined;
     let paymentIntentId: string | undefined;
