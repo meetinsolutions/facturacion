@@ -452,6 +452,62 @@ async function runTestSuite() {
     assert.strictEqual(compValidado.tenantId, tenantA_id);
   });
 
+  // 15. Protección bajo concurrencia: Múltiples solicitudes simultáneas no burlan el rate limit ni el bloqueo
+  await test('15. Concurrencia: Peticiones simultáneas respetan locks de transacción y cooldown', async () => {
+    const concurrentEmail = 'concurrent.test@empresa.cr';
+    // Insertar un comprobante para este correo
+    await pool.query(`
+      INSERT INTO comprobantes (tenant_id, clave, consecutivo, tipo_documento, fecha, moneda, total, cliente, estado_hacienda, estilo, notas, correo_cliente, correo_destinatario, xml_firmado, doc_original_json)
+      VALUES ($1, '50621112600310188811100100001010000000999199999999', '00100001010000000999', '01', NOW(), 'CRC', 1000, 'Test Concurrente', 'aceptado', 'ejecutivo', '', $2, $2, '<xml/>', '{"receptor":{"correo":"concurrent.test@empresa.cr"}}')
+    `, [tenantA_id, concurrentEmail]);
+
+    // Ejecutar 3 solicitudes exactamente concurrentes
+    const resultados = await Promise.all([
+      solicitarOtpCliente(concurrentEmail, '10.0.0.10', undefined, pool),
+      solicitarOtpCliente(concurrentEmail, '10.0.0.10', undefined, pool),
+      solicitarOtpCliente(concurrentEmail, '10.0.0.10', undefined, pool)
+    ]);
+
+    // Una debe haber tenido éxito y las otras deben haber recibido cooldown / rate limit
+    const exitosas = resultados.filter(r => r.ok).length;
+    const bloqueadas = resultados.filter(r => !r.ok).length;
+    assert.strictEqual(exitosas, 1, 'Exactamente 1 petición concurrente debe tener éxito');
+    assert.strictEqual(bloqueadas, 2, 'Las peticiones concurrentes simultáneas deben ser bloqueadas por cooldown');
+
+    // Limpiar comprobante de prueba
+    await pool.query("DELETE FROM comprobantes WHERE clave = '50621112600310188811100100001010000000999199999999'");
+    await pool.query('DELETE FROM portal_clientes_otp WHERE email = $1', [concurrentEmail]);
+  });
+
+  // 16. Aislamiento cuando se comparte correo electrónico: La cédula del receptor desambigua y aísla los comprobantes
+  await test('16. Correo compartido: Receptor A con cédula 1 no accede a comprobantes de Receptor B con cédula 2', async () => {
+    const sharedEmail = 'contabilidad.compartida@despacho.cr';
+    const cedula1 = '3102111111';
+    const cedula2 = '3102222222';
+    const claveDoc1 = '50621112600310188811100100001010000000999111111111';
+    const claveDoc2 = '50621112600310188811100100001010000000999222222222';
+
+    // Insertar dos comprobantes para el mismo correo pero diferente cédula de receptor
+    await pool.query(`
+      INSERT INTO comprobantes (tenant_id, clave, consecutivo, tipo_documento, fecha, moneda, total, cliente, estado_hacienda, estilo, notas, correo_cliente, correo_destinatario, xml_firmado, doc_original_json)
+      VALUES 
+        ($1, $2, '00100001010000000111', '01', NOW(), 'CRC', 15000, 'Empresa Uno', 'aceptado', 'ejecutivo', '', $3, $3, '<xml/>', '{"receptor":{"correo":"contabilidad.compartida@despacho.cr","identificacion":{"tipo":"02","numero":"3102111111"}}}'),
+        ($1, $4, '00100001010000000222', '01', NOW(), 'CRC', 25000, 'Empresa Dos', 'aceptado', 'ejecutivo', '', $3, $3, '<xml/>', '{"receptor":{"correo":"contabilidad.compartida@despacho.cr","identificacion":{"tipo":"02","numero":"3102222222"}}}')
+    `, [tenantA_id, claveDoc1, sharedEmail, claveDoc2]);
+
+    // Consultar historial filtrando por cédula del Receptor 1
+    const listadoR1 = await listarComprobantesCliente(sharedEmail, { cedulaReceptor: cedula1 }, pool);
+    assert.strictEqual(listadoR1.total, 1);
+    assert.strictEqual(listadoR1.comprobantes[0].clave, claveDoc1);
+
+    // Intentar obtener el documento del Receptor 2 usando la cédula del Receptor 1 debe retornar NULL
+    const accesoCruzado = await obtenerComprobanteClienteAutorizado(sharedEmail, claveDoc2, cedula1, pool);
+    assert.strictEqual(accesoCruzado, null, 'Receptor 1 no debe tener acceso al comprobante de Receptor 2');
+
+    // Limpiar datos
+    await pool.query('DELETE FROM comprobantes WHERE clave IN ($1, $2)', [claveDoc1, claveDoc2]);
+  });
+
   console.log('\n======================================================================');
   console.log(`RESULTADO DE LA SUITE INCREMENTO 2: ${exitosas}/${total} PRUEBAS EXITOSAS`);
   console.log('======================================================================');

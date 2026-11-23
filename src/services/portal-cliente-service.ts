@@ -1,6 +1,8 @@
 /**
  * MEETINFACT — PORTAL DE COMPROBANTES: INCREMENTO 2
  * Servicio de autenticación OTP, sesiones temporales seguras y consulta de historial para clientes
+ * Incluye protección contra concurrencia mediante bloqueos consultivos de transacción (advisory locks)
+ * y aislamiento estricto por receptor (cédula/identificación y correo).
  */
 import crypto from 'crypto';
 import { Pool } from 'pg';
@@ -49,6 +51,7 @@ export interface FiltrosHistorialCliente {
   estado?: string;
   tipoDocumento?: string;
   tenantId?: string;
+  cedulaReceptor?: string;
   limite?: number;
   offset?: number;
 }
@@ -62,15 +65,28 @@ export interface ResultadoHistorialCliente {
 
 /**
  * Solicita el envío de un código OTP para acceder al portal de clientes.
- * Aplica anti-enumeración estricta: siempre responde con éxito sin revelar si el correo existe.
+ * Aplica anti-enumeración estricta y protección contra concurrencia con advisory locks.
  */
 export async function solicitarOtpCliente(
   emailRaw: string,
   clientIp: string = '127.0.0.1',
+  cedulaReceptorOrPool?: string | Pool,
   poolOverride?: Pool
 ): Promise<{ ok: boolean; mensaje: string; cooldown?: number }> {
-  const db = poolOverride || pool;
+  let db = pool;
+  let cedulaReceptorRaw = '';
+
+  if (cedulaReceptorOrPool && typeof (cedulaReceptorOrPool as any).query === 'function') {
+    db = cedulaReceptorOrPool as Pool;
+  } else if (typeof cedulaReceptorOrPool === 'string') {
+    cedulaReceptorRaw = cedulaReceptorOrPool;
+    db = poolOverride || pool;
+  } else if (poolOverride) {
+    db = poolOverride;
+  }
+
   const email = (emailRaw || '').trim().toLowerCase();
+  const cedulaReceptor = (cedulaReceptorRaw || '').replace(/\D/g, '').trim();
 
   if (!email || !EMAIL_REGEX.test(email)) {
     return {
@@ -79,83 +95,110 @@ export async function solicitarOtpCliente(
     };
   }
 
-  // 1. Control de frecuencia (Rate Limiting y Cooldown)
-  const rateCheck = await db.query(
-    `SELECT created_at 
-     FROM portal_clientes_otp 
-     WHERE email = $1 AND created_at > NOW() - ($2 || ' minutes')::interval 
-     ORDER BY created_at DESC`,
-    [email, VENTANA_RATE_LIMIT_MINUTOS]
-  );
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
 
-  if (rateCheck.rowCount && rateCheck.rowCount >= OTP_MAX_SOLICITUDES_VENTANA) {
-    return {
-      ok: false,
-      mensaje: 'Ha alcanzado el límite de solicitudes. Por seguridad, intente nuevamente más tarde.'
-    };
-  }
+    // Bloqueo consultivo a nivel de transacción para serializar peticiones simultáneas del mismo correo
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['otp_solicitar_' + email]);
 
-  if (rateCheck.rowCount && rateCheck.rowCount > 0) {
-    const ultimoEnvio = new Date(rateCheck.rows[0].created_at).getTime();
-    const ahora = Date.now();
-    const diffSegundos = Math.floor((ahora - ultimoEnvio) / 1000);
-    if (diffSegundos < OTP_COOLDOWN_SEGUNDOS) {
-      const restante = OTP_COOLDOWN_SEGUNDOS - diffSegundos;
+    // 1. Control de frecuencia (Rate Limiting y Cooldown)
+    const rateCheck = await client.query(
+      `SELECT created_at 
+       FROM portal_clientes_otp 
+       WHERE email = $1 AND created_at > NOW() - ($2 || ' minutes')::interval 
+       ORDER BY created_at DESC`,
+      [email, VENTANA_RATE_LIMIT_MINUTOS]
+    );
+
+    if (rateCheck.rowCount && rateCheck.rowCount >= OTP_MAX_SOLICITUDES_VENTANA) {
+      await client.query('ROLLBACK');
       return {
         ok: false,
-        mensaje: `Por favor espere ${restante} segundos antes de solicitar otro código.`,
-        cooldown: restante
+        mensaje: 'Ha alcanzado el límite de solicitudes. Por seguridad, intente nuevamente más tarde.'
       };
     }
-  }
 
-  // 2. Verificación de existencia de comprobantes asociados al receptor
-  const compCheck = await db.query(
-    `SELECT 1 FROM comprobantes 
-     WHERE (
-       LOWER(TRIM(correo_cliente)) = $1 
-       OR LOWER(TRIM(correo_destinatario)) = $1 
-       OR LOWER(TRIM(doc_original_json->'receptor'->>'correo')) = $1
-     ) LIMIT 1`,
-    [email]
-  );
+    if (rateCheck.rowCount && rateCheck.rowCount > 0) {
+      const ultimoEnvio = new Date(rateCheck.rows[0].created_at).getTime();
+      const ahora = Date.now();
+      const diffSegundos = Math.floor((ahora - ultimoEnvio) / 1000);
+      if (diffSegundos < OTP_COOLDOWN_SEGUNDOS) {
+        const restante = OTP_COOLDOWN_SEGUNDOS - diffSegundos;
+        await client.query('ROLLBACK');
+        return {
+          ok: false,
+          mensaje: `Por favor espere ${restante} segundos antes de solicitar otro código.`,
+          cooldown: restante
+        };
+      }
+    }
 
-  // Mensaje uniforme para prevenir enumeración de correos
-  const mensajeRespuestaUniforme =
-    'Si la dirección de correo cuenta con comprobantes asociados, recibirá un código de verificación en breve.';
+    // 2. Verificación de existencia de comprobantes asociados al receptor
+    // Si se especifica cédula, restringe la búsqueda a ese receptor exacto
+    let compCheckQuery = `
+      SELECT 1 FROM comprobantes c
+      WHERE (
+        LOWER(TRIM(c.correo_cliente)) = $1 
+        OR LOWER(TRIM(c.correo_destinatario)) = $1 
+        OR LOWER(TRIM(c.doc_original_json->'receptor'->>'correo')) = $1
+      )
+    `;
+    const checkParams: any[] = [email];
 
-  if (!compCheck.rowCount || compCheck.rowCount === 0) {
-    // No revelar que el correo no existe en la base de datos
+    if (cedulaReceptor) {
+      compCheckQuery += ` AND regexp_replace(c.doc_original_json->'receptor'->'identificacion'->>'numero', '\\D', '', 'g') = $2`;
+      checkParams.push(cedulaReceptor);
+    }
+    compCheckQuery += ` LIMIT 1`;
+
+    const compCheck = await client.query(compCheckQuery, checkParams);
+
+    // Mensaje uniforme para prevenir enumeración de correos
+    const mensajeRespuestaUniforme =
+      'Si la dirección de correo cuenta con comprobantes asociados, recibirá un código de verificación en breve.';
+
+    if (!compCheck.rowCount || compCheck.rowCount === 0) {
+      await client.query('COMMIT');
+      return { ok: true, mensaje: mensajeRespuestaUniforme };
+    }
+
+    // 3. Generación criptográfica del OTP (6 dígitos numéricos)
+    const otpNumber = crypto.randomInt(100000, 1000000);
+    const otpCode = otpNumber.toString();
+    const otpHash = crypto.createHash('sha256').update(otpCode).digest('hex');
+    const expiresAt = new Date(Date.now() + OTP_EXPIRACION_MINUTOS * 60 * 1000);
+
+    // 4. Invalidar códigos previos no utilizados para este correo
+    await client.query(
+      `UPDATE portal_clientes_otp SET used = TRUE WHERE email = $1 AND used = FALSE`,
+      [email]
+    );
+
+    // 5. Persistir el hash del OTP (NUNCA el código en texto plano)
+    await client.query(
+      `INSERT INTO portal_clientes_otp (email, cedula_receptor, otp_hash, expires_at, max_attempts, ip_address)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [email, cedulaReceptor || null, otpHash, expiresAt, OTP_MAX_INTENTOS, clientIp]
+    );
+
+    await client.query('COMMIT');
+
+    // 6. Registro exclusivo para pruebas en QA
+    _qaOtpTestingStore.set(email, otpCode);
+
     return { ok: true, mensaje: mensajeRespuestaUniforme };
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
   }
-
-  // 3. Generación criptográfica del OTP (6 dígitos numéricos)
-  const otpNumber = crypto.randomInt(100000, 1000000);
-  const otpCode = otpNumber.toString();
-  const otpHash = crypto.createHash('sha256').update(otpCode).digest('hex');
-  const expiresAt = new Date(Date.now() + OTP_EXPIRACION_MINUTOS * 60 * 1000);
-
-  // 4. Invalidar códigos previos no utilizados para este correo
-  await db.query(
-    `UPDATE portal_clientes_otp SET used = TRUE WHERE email = $1 AND used = FALSE`,
-    [email]
-  );
-
-  // 5. Persistir el hash del OTP (NUNCA el código en texto plano)
-  await db.query(
-    `INSERT INTO portal_clientes_otp (email, otp_hash, expires_at, max_attempts, ip_address)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [email, otpHash, expiresAt, OTP_MAX_INTENTOS, clientIp]
-  );
-
-  // 6. Registro exclusivo para pruebas en QA
-  _qaOtpTestingStore.set(email, otpCode);
-
-  return { ok: true, mensaje: mensajeRespuestaUniforme };
 }
 
 /**
  * Verifica el código OTP provisto por el usuario y genera una sesión temporal segura.
+ * Aplica advisory lock y FOR UPDATE para serializar verificaciones concurrentes.
  */
 export async function verificarOtpCliente(
   emailRaw: string,
@@ -171,74 +214,93 @@ export async function verificarOtpCliente(
     return { ok: false, error: 'Código de verificación inválido. Debe contener 6 dígitos.' };
   }
 
-  // 1. Buscar OTP vigente no utilizado
-  const res = await db.query(
-    `SELECT id, otp_hash, expires_at, attempts, max_attempts 
-     FROM portal_clientes_otp 
-     WHERE email = $1 AND used = FALSE AND expires_at > NOW() 
-     ORDER BY created_at DESC LIMIT 1`,
-    [email]
-  );
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
 
-  if (!res.rowCount || res.rowCount === 0) {
-    return { ok: false, error: 'Código inválido o expirado. Por favor solicite uno nuevo.' };
-  }
+    // Bloqueo consultivo de verificación concurrente
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['otp_verificar_' + email]);
 
-  const record = res.rows[0];
-
-  if (record.attempts >= record.max_attempts) {
-    await db.query(`UPDATE portal_clientes_otp SET used = TRUE WHERE id = $1`, [record.id]);
-    return { ok: false, error: 'Ha superado el número máximo de intentos. Solicite un nuevo código.' };
-  }
-
-  // 2. Comparación de hash en tiempo constante (protección contra timing attacks)
-  const inputHash = crypto.createHash('sha256').update(otp).digest('hex');
-  const storedBuf = Buffer.from(record.otp_hash, 'hex');
-  const inputBuf = Buffer.from(inputHash, 'hex');
-
-  const matches = storedBuf.length === inputBuf.length && crypto.timingSafeEqual(storedBuf, inputBuf);
-
-  if (!matches) {
-    const nuevosIntentos = record.attempts + 1;
-    const esUltimo = nuevosIntentos >= record.max_attempts;
-
-    await db.query(
-      `UPDATE portal_clientes_otp 
-       SET attempts = $1, used = $2 
-       WHERE id = $3`,
-      [nuevosIntentos, esUltimo, record.id]
+    // 1. Buscar OTP vigente no utilizado bloqueando la fila
+    const res = await client.query(
+      `SELECT id, otp_hash, expires_at, attempts, max_attempts, cedula_receptor 
+       FROM portal_clientes_otp 
+       WHERE email = $1 AND used = FALSE AND expires_at > NOW() 
+       ORDER BY created_at DESC LIMIT 1
+       FOR UPDATE`,
+      [email]
     );
 
-    const restantes = Math.max(0, record.max_attempts - nuevosIntentos);
+    if (!res.rowCount || res.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return { ok: false, error: 'Código inválido o expirado. Por favor solicite uno nuevo.' };
+    }
+
+    const record = res.rows[0];
+
+    if (record.attempts >= record.max_attempts) {
+      await client.query(`UPDATE portal_clientes_otp SET used = TRUE WHERE id = $1`, [record.id]);
+      await client.query('COMMIT');
+      return { ok: false, error: 'Ha superado el número máximo de intentos. Solicite un nuevo código.' };
+    }
+
+    // 2. Comparación de hash en tiempo constante (protección contra timing attacks)
+    const inputHash = crypto.createHash('sha256').update(otp).digest('hex');
+    const storedBuf = Buffer.from(record.otp_hash, 'hex');
+    const inputBuf = Buffer.from(inputHash, 'hex');
+
+    const matches = storedBuf.length === inputBuf.length && crypto.timingSafeEqual(storedBuf, inputBuf);
+
+    if (!matches) {
+      const nuevosIntentos = record.attempts + 1;
+      const esUltimo = nuevosIntentos >= record.max_attempts;
+
+      await client.query(
+        `UPDATE portal_clientes_otp 
+         SET attempts = $1, used = $2 
+         WHERE id = $3`,
+        [nuevosIntentos, esUltimo, record.id]
+      );
+      await client.query('COMMIT');
+
+      const restantes = Math.max(0, record.max_attempts - nuevosIntentos);
+      return {
+        ok: false,
+        error: esUltimo
+          ? 'Código incorrecto. Ha alcanzado el límite de intentos permitidos. Solicite un nuevo código.'
+          : `Código de verificación incorrecto. Le quedan ${restantes} intento(s).`,
+        intentosRestantes: restantes
+      };
+    }
+
+    // 3. OTP correcto: Quemar el código de inmediato (single-use estricto)
+    await client.query(`UPDATE portal_clientes_otp SET used = TRUE WHERE id = $1`, [record.id]);
+    _qaOtpTestingStore.delete(email);
+
+    // 4. Crear sesión criptográfica con 256 bits de entropía
+    const rawSessionToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawSessionToken).digest('hex');
+    const expiraEn = new Date(Date.now() + SESION_EXPIRACION_HORAS * 3600 * 1000);
+
+    await client.query(
+      `INSERT INTO portal_clientes_sesiones (email, cedula_receptor, token_hash, expires_at, ip_address, user_agent)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [email, record.cedula_receptor || null, tokenHash, expiraEn, clientInfo.ip || null, clientInfo.userAgent || null]
+    );
+
+    await client.query('COMMIT');
+
     return {
-      ok: false,
-      error: esUltimo
-        ? 'Código incorrecto. Ha alcanzado el límite de intentos permitidos. Solicite un nuevo código.'
-        : `Código de verificación incorrecto. Le quedan ${restantes} intento(s).`,
-      intentosRestantes: restantes
+      ok: true,
+      sessionToken: rawSessionToken,
+      expiraEn
     };
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
   }
-
-  // 3. OTP correcto: Quemar el código de inmediato (single-use estricto)
-  await db.query(`UPDATE portal_clientes_otp SET used = TRUE WHERE id = $1`, [record.id]);
-  _qaOtpTestingStore.delete(email);
-
-  // 4. Crear sesión criptográfica con 256 bits de entropía
-  const rawSessionToken = crypto.randomBytes(32).toString('hex');
-  const tokenHash = crypto.createHash('sha256').update(rawSessionToken).digest('hex');
-  const expiraEn = new Date(Date.now() + SESION_EXPIRACION_HORAS * 3600 * 1000);
-
-  await db.query(
-    `INSERT INTO portal_clientes_sesiones (email, token_hash, expires_at, ip_address, user_agent)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [email, tokenHash, expiraEn, clientInfo.ip || null, clientInfo.userAgent || null]
-  );
-
-  return {
-    ok: true,
-    sessionToken: rawSessionToken,
-    expiraEn
-  };
 }
 
 /**
@@ -247,7 +309,7 @@ export async function verificarOtpCliente(
 export async function validarSesionCliente(
   rawToken: string,
   poolOverride?: Pool
-): Promise<{ valid: boolean; session?: { id: string; email: string; expiraEn: Date }; error?: string }> {
+): Promise<{ valid: boolean; session?: { id: string; email: string; cedulaReceptor?: string; expiraEn: Date }; error?: string }> {
   const db = poolOverride || pool;
   if (!rawToken || typeof rawToken !== 'string') {
     return { valid: false, error: 'Token de sesión no provisto.' };
@@ -256,7 +318,7 @@ export async function validarSesionCliente(
   const tokenHash = crypto.createHash('sha256').update(rawToken.trim()).digest('hex');
 
   const res = await db.query(
-    `SELECT id, email, expires_at, revocado 
+    `SELECT id, email, cedula_receptor, expires_at, revocado 
      FROM portal_clientes_sesiones 
      WHERE token_hash = $1`,
     [tokenHash]
@@ -285,6 +347,7 @@ export async function validarSesionCliente(
     session: {
       id: s.id,
       email: s.email,
+      cedulaReceptor: s.cedula_receptor || undefined,
       expiraEn: new Date(s.expires_at)
     }
   };
@@ -307,7 +370,7 @@ export async function revocarSesionCliente(rawToken: string, poolOverride?: Pool
 
 /**
  * Consulta el historial de comprobantes para el receptor autenticado.
- * Aplica aislamiento estricto: solo muestra comprobantes donde el receptor coincide con el email verificado.
+ * Aplica aislamiento estricto por correo y por cédula/identificación del receptor.
  */
 export async function listarComprobantesCliente(
   email: string,
@@ -326,6 +389,14 @@ export async function listarComprobantesCliente(
   ];
   const params: any[] = [em];
   let pIdx = 2;
+
+  // Aislamiento por cédula/identificación de receptor (previene acceso cruzado cuando se comparte un correo)
+  const cedulaReceptor = (filtros.cedulaReceptor || '').replace(/\D/g, '').trim();
+  if (cedulaReceptor) {
+    condiciones.push(`regexp_replace(c.doc_original_json->'receptor'->'identificacion'->>'numero', '\\D', '', 'g') = $${pIdx}`);
+    params.push(cedulaReceptor);
+    pIdx++;
+  }
 
   if (filtros.fechaDesde) {
     try {
@@ -429,28 +500,48 @@ export async function listarComprobantesCliente(
 export async function obtenerComprobanteClienteAutorizado(
   email: string,
   clave: string,
+  cedulaOrPool?: string | Pool,
   poolOverride?: Pool
 ): Promise<{
   comprobante: ComprobanteGuardado & { tenantId: string; docOriginalJson?: any };
   emisorNombre: string;
 } | null> {
-  const db = poolOverride || pool;
+  let db = pool;
+  let cedulaReceptorRaw = '';
+
+  if (cedulaOrPool && typeof (cedulaOrPool as any).query === 'function') {
+    db = cedulaOrPool as Pool;
+  } else if (typeof cedulaOrPool === 'string') {
+    cedulaReceptorRaw = cedulaOrPool;
+    db = poolOverride || pool;
+  } else if (poolOverride) {
+    db = poolOverride;
+  }
+
   const em = (email || '').trim().toLowerCase();
   const cl = (clave || '').trim();
+  const cedulaReceptor = (cedulaReceptorRaw || '').replace(/\D/g, '').trim();
 
-  const res = await db.query(
-    `SELECT c.*, COALESCE(t.nombre, 'Emisor MeetinFact') AS emisor_nombre
-     FROM comprobantes c
-     LEFT JOIN tenants t ON t.id = c.tenant_id
-     WHERE c.clave = $1
-       AND (
-         LOWER(TRIM(c.correo_cliente)) = $2 
-         OR LOWER(TRIM(c.correo_destinatario)) = $2 
-         OR LOWER(TRIM(c.doc_original_json->'receptor'->>'correo')) = $2
-       )
-     LIMIT 1`,
-    [cl, em]
-  );
+  let query = `
+    SELECT c.*, COALESCE(t.nombre, 'Emisor MeetinFact') AS emisor_nombre
+    FROM comprobantes c
+    LEFT JOIN tenants t ON t.id = c.tenant_id
+    WHERE c.clave = $1
+      AND (
+        LOWER(TRIM(c.correo_cliente)) = $2 
+        OR LOWER(TRIM(c.correo_destinatario)) = $2 
+        OR LOWER(TRIM(c.doc_original_json->'receptor'->>'correo')) = $2
+      )
+  `;
+  const params: any[] = [cl, em];
+
+  if (cedulaReceptor) {
+    query += ` AND regexp_replace(c.doc_original_json->'receptor'->'identificacion'->>'numero', '\\D', '', 'g') = $3`;
+    params.push(cedulaReceptor);
+  }
+  query += ` LIMIT 1`;
+
+  const res = await db.query(query, params);
 
   if (!res.rowCount || res.rowCount === 0) {
     return null;

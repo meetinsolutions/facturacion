@@ -695,7 +695,7 @@ function extraerTokenSesionCliente(req: Request): string {
   return '';
 }
 
-async function exigirSesionCliente(req: Request, res: Response): Promise<{ id: string; email: string } | null> {
+async function exigirSesionCliente(req: Request, res: Response): Promise<{ id: string; email: string; cedulaReceptor?: string } | null> {
   const token = extraerTokenSesionCliente(req);
   if (!token) {
     res.status(401).json({ ok: false, error: 'Sesión no provista o no autorizada.' });
@@ -723,7 +723,8 @@ app.get(['/c/portal', '/c/historial'], (req, res) => {
 // Endpoint público para solicitud de código OTP
 app.post('/api/public/portal/auth/solicitar-otp', ah(async (req, res) => {
   const email = String(req.body?.email || '');
-  const result = await solicitarOtpCliente(email, req.ip);
+  const cedulaReceptor = req.body?.cedulaReceptor ? String(req.body.cedulaReceptor) : undefined;
+  const result = await solicitarOtpCliente(email, req.ip, cedulaReceptor);
   setPortalSecurityHeaders(res);
   if (!result.ok) {
     return res.status(400).json(result);
@@ -745,7 +746,7 @@ app.post('/api/public/portal/auth/verificar-otp', ah(async (req, res) => {
     return res.status(400).json(result);
   }
 
-  // Establecer cookie HttpOnly segura
+  // Establecer cookie HttpOnly segura (cero exposición del token al JavaScript del cliente)
   res.cookie('portal_session', result.sessionToken, {
     httpOnly: true,
     sameSite: 'strict',
@@ -756,9 +757,26 @@ app.post('/api/public/portal/auth/verificar-otp', ah(async (req, res) => {
 
   res.json({
     ok: true,
-    sessionToken: result.sessionToken,
     expiraEn: result.expiraEn,
     mensaje: 'Autenticación exitosa.'
+  });
+}));
+
+// Endpoint para comprobar estado de sesión sin exponer tokens a JavaScript
+app.get('/api/public/portal/auth/check', ah(async (req, res) => {
+  setPortalSecurityHeaders(res);
+  const token = extraerTokenSesionCliente(req);
+  if (!token) {
+    return res.json({ authenticated: false });
+  }
+  const result = await validarSesionCliente(token);
+  if (!result.valid || !result.session) {
+    return res.json({ authenticated: false });
+  }
+  res.json({
+    authenticated: true,
+    email: result.session.email,
+    cedulaReceptor: result.session.cedulaReceptor
   });
 }));
 
@@ -784,6 +802,7 @@ app.get('/api/public/portal/comprobantes', ah(async (req, res) => {
     tipoDocumento: req.query.tipoDocumento ? String(req.query.tipoDocumento) : undefined,
     estado: req.query.estado ? String(req.query.estado) : undefined,
     tenantId: req.query.tenantId ? String(req.query.tenantId) : undefined,
+    cedulaReceptor: session.cedulaReceptor || (req.query.cedulaReceptor ? String(req.query.cedulaReceptor) : undefined),
     limite: req.query.limite ? Number(req.query.limite) : 20,
     offset: req.query.pagina ? (Math.max(Number(req.query.pagina), 1) - 1) * (Number(req.query.limite) || 20) : undefined
   });
@@ -802,7 +821,7 @@ app.get('/api/public/portal/comprobante/:clave', ah(async (req, res) => {
   if (!session) return;
 
   const clave = String(req.params.clave || '').trim();
-  const data = await obtenerComprobanteClienteAutorizado(session.email, clave);
+  const data = await obtenerComprobanteClienteAutorizado(session.email, clave, session.cedulaReceptor);
   if (!data) {
     setPortalSecurityHeaders(res);
     return res.status(404).json({ ok: false, error: 'Comprobante no encontrado o no autorizado.' });
@@ -856,7 +875,7 @@ app.get('/api/public/portal/comprobante/:clave/xml', ah(async (req, res) => {
   if (!session) return;
 
   const clave = String(req.params.clave || '').trim();
-  const data = await obtenerComprobanteClienteAutorizado(session.email, clave);
+  const data = await obtenerComprobanteClienteAutorizado(session.email, clave, session.cedulaReceptor);
   if (!data) {
     setPortalSecurityHeaders(res);
     return res.status(404).send('Comprobante no encontrado o no autorizado.');
@@ -887,7 +906,7 @@ app.get('/api/public/portal/comprobante/:clave/pdf', ah(async (req, res) => {
   if (!session) return;
 
   const clave = String(req.params.clave || '').trim();
-  const data = await obtenerComprobanteClienteAutorizado(session.email, clave);
+  const data = await obtenerComprobanteClienteAutorizado(session.email, clave, session.cedulaReceptor);
   if (!data) {
     setPortalSecurityHeaders(res);
     return res.status(404).send('Comprobante no encontrado o no autorizado.');

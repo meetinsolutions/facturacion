@@ -82,6 +82,11 @@ export function renderPortalClienteAppHTML(esQA: boolean = true): string {
             <input type="email" id="inputEmail" required placeholder="ejemplo@empresa.com" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
           </div>
 
+          <div>
+            <label for="inputCedula" class="block text-xs font-medium text-slate-400 mb-1.5">Cédula / Identificación del Receptor <span class="text-slate-500 text-[11px]">(Opcional)</span></label>
+            <input type="text" id="inputCedula" placeholder="Ej: 3-101-123456" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+          </div>
+
           <div id="alertSolicitar" class="hidden rounded-xl p-3 text-xs"></div>
 
           <button type="submit" id="btnSolicitarOtp" class="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm shadow-lg shadow-indigo-600/25 transition flex items-center justify-center gap-2">
@@ -271,20 +276,20 @@ export function renderPortalClienteAppHTML(esQA: boolean = true): string {
 
     const portalApp = {
       email: '',
-      sessionToken: '',
       cooldownTimer: null,
       cooldownSeconds: 0,
 
-      init() {
-        const savedToken = localStorage.getItem('mf_portal_token');
-        const savedEmail = localStorage.getItem('mf_portal_email');
-        if (savedToken && savedEmail) {
-          this.sessionToken = savedToken;
-          this.email = savedEmail;
-          this.mostrarHistorial();
-        } else {
-          this.mostrarVistaSolicitar();
-        }
+      async init() {
+        try {
+          const res = await fetch('/api/public/portal/auth/check', { credentials: 'same-origin' });
+          const data = await res.json();
+          if (data.authenticated && data.email) {
+            this.email = data.email;
+            this.mostrarHistorial();
+            return;
+          }
+        } catch {}
+        this.mostrarVistaSolicitar();
       },
 
       mostrarVistaSolicitar() {
@@ -317,6 +322,7 @@ export function renderPortalClienteAppHTML(esQA: boolean = true): string {
       async solicitarOtp(e) {
         e.preventDefault();
         const email = document.getElementById('inputEmail').value.trim();
+        const cedulaReceptor = (document.getElementById('inputCedula')?.value || '').trim();
         const btn = document.getElementById('btnSolicitarOtp');
         const alertEl = document.getElementById('alertSolicitar');
 
@@ -327,8 +333,9 @@ export function renderPortalClienteAppHTML(esQA: boolean = true): string {
         try {
           const res = await fetch('/api/public/portal/auth/solicitar-otp', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email })
+            body: JSON.stringify({ email, cedulaReceptor })
           });
           const data = await res.json();
 
@@ -363,15 +370,13 @@ export function renderPortalClienteAppHTML(esQA: boolean = true): string {
         try {
           const res = await fetch('/api/public/portal/auth/verificar-otp', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: this.email, otp })
           });
           const data = await res.json();
 
-          if (data.ok && data.sessionToken) {
-            this.sessionToken = data.sessionToken;
-            localStorage.setItem('mf_portal_token', data.sessionToken);
-            localStorage.setItem('mf_portal_email', this.email);
+          if (data.ok) {
             this.mostrarHistorial();
           } else {
             alertEl.className = 'rounded-xl p-3 text-xs bg-rose-500/10 border border-rose-500/20 text-rose-300';
@@ -409,10 +414,25 @@ export function renderPortalClienteAppHTML(esQA: boolean = true): string {
 
         try {
           const res = await fetch('/api/public/portal/comprobantes?' + params.toString(), {
-            headers: {
-              'Authorization': 'Bearer ' + this.sessionToken
-            }
+            credentials: 'same-origin'
           });
+
+          if (res.status === 401) {
+            this.cerrarSesion();
+            return;
+          }
+
+          const data = await res.json();
+          if (!data.ok) throw new Error(data.error);
+
+          this.renderizarListado(data.comprobantes || []);
+          this.renderizarEstadisticas(data.comprobantes || [], data.total || 0);
+          this.renderizarPaginador(data.total || 0, data.pagina || 1, data.totalPaginas || 1);
+        } catch (err) {
+          tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-rose-400">Error al cargar comprobantes.</td></tr>';
+          cards.innerHTML = '<div class="p-6 text-center text-rose-400 text-xs">Error al cargar comprobantes.</div>';
+        }
+      },
 
           if (res.status === 401) {
             this.cerrarSesion();
@@ -540,7 +560,7 @@ export function renderPortalClienteAppHTML(esQA: boolean = true): string {
         const modal = document.getElementById('modalVisualizador');
         const iframe = document.getElementById('modalIframe');
         document.getElementById('modalTitulo').innerText = 'Comprobante ' + clave;
-        iframe.src = '/api/public/portal/comprobante/' + encodeURIComponent(clave) + '?token=' + encodeURIComponent(this.sessionToken);
+        iframe.src = '/api/public/portal/comprobante/' + encodeURIComponent(clave);
         modal.classList.remove('hidden');
       },
 
@@ -599,16 +619,13 @@ export function renderPortalClienteAppHTML(esQA: boolean = true): string {
         try {
           await fetch('/api/public/portal/auth/logout', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer ' + this.sessionToken
+              'Content-Type': 'application/json'
             }
           });
         } catch {}
 
-        localStorage.removeItem('mf_portal_token');
-        localStorage.removeItem('mf_portal_email');
-        this.sessionToken = '';
         this.email = '';
         this.mostrarVistaSolicitar();
       }

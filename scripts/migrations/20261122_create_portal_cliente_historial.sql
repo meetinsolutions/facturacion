@@ -8,6 +8,7 @@
 CREATE TABLE IF NOT EXISTS portal_clientes_otp (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email TEXT NOT NULL,
+  cedula_receptor TEXT,
   otp_hash TEXT NOT NULL,
   expires_at TIMESTAMPTZ NOT NULL,
   attempts INT NOT NULL DEFAULT 0,
@@ -16,6 +17,9 @@ CREATE TABLE IF NOT EXISTS portal_clientes_otp (
   ip_address TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE portal_clientes_otp 
+  ADD COLUMN IF NOT EXISTS cedula_receptor TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_portal_otp_email_active 
   ON portal_clientes_otp (email, expires_at) 
@@ -28,6 +32,7 @@ CREATE INDEX IF NOT EXISTS idx_portal_otp_email_created
 CREATE TABLE IF NOT EXISTS portal_clientes_sesiones (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email TEXT NOT NULL,
+  cedula_receptor TEXT,
   token_hash TEXT NOT NULL UNIQUE,
   expires_at TIMESTAMPTZ NOT NULL,
   ip_address TEXT,
@@ -36,6 +41,9 @@ CREATE TABLE IF NOT EXISTS portal_clientes_sesiones (
   creado_en TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   ultimo_acceso_en TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE portal_clientes_sesiones 
+  ADD COLUMN IF NOT EXISTS cedula_receptor TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_portal_sesiones_token_hash 
   ON portal_clientes_sesiones (token_hash) 
