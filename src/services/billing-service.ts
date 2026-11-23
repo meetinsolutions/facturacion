@@ -7,14 +7,22 @@ export interface PlanRecord {
   code: string;
   nombre: string;
   descripcion: string;
-  precio_mensual_usd: number;
-  precio_anual_usd: number;
+  precio_mensual_crc: number;
+  precio_anual_crc: number;
+  precio_mensual_usd?: number;
+  precio_anual_usd?: number;
+  moneda: string;
   limite_comprobantes_mes: number;
   limite_usuarios: number;
   permite_imap_gastos: boolean;
   permite_envio_correo: boolean;
   activo: boolean;
   orden: number;
+}
+
+export function formatCRC(amount: number): string {
+  const rounded = Math.round(amount);
+  return '₡' + rounded.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 }
 
 export interface GatewaysConfig {
@@ -39,7 +47,8 @@ export interface GatewaysConfig {
     numero: string;
     titular: string;
     banco: string;
-    tipoCambioUsd: number;
+    tipoCambioUsd?: number;
+    moneda?: string;
   };
 }
 
@@ -52,17 +61,22 @@ const DEFAULT_GATEWAYS: GatewaysConfig = {
     numero: '60450476',
     titular: 'GIOVANNI IEZZI FERNANDEZ',
     banco: 'SINPE Móvil Costa Rica',
-    tipoCambioUsd: 510
+    moneda: 'CRC'
   }
 };
 
 function mapPlan(row: any): PlanRecord {
+  const mensualCrc = Number(row.precio_mensual_crc ?? row.precio_mensual_usd ?? 0);
+  const anualCrc = Number(row.precio_anual_crc ?? row.precio_anual_usd ?? 0);
   return {
     code: row.code,
     nombre: row.nombre,
     descripcion: row.descripcion,
-    precio_mensual_usd: Number(row.precio_mensual_usd),
-    precio_anual_usd: Number(row.precio_anual_usd),
+    precio_mensual_crc: mensualCrc,
+    precio_anual_crc: anualCrc,
+    precio_mensual_usd: Number(row.precio_mensual_usd ?? 0),
+    precio_anual_usd: Number(row.precio_anual_usd ?? 0),
+    moneda: row.moneda || 'CRC',
     limite_comprobantes_mes: Number(row.limite_comprobantes_mes),
     limite_usuarios: Number(row.limite_usuarios),
     permite_imap_gastos: Boolean(row.permite_imap_gastos),
@@ -135,8 +149,8 @@ export async function getEstadoSuscripcion(tenantId: string) {
 
   const subRes = await pool.query(
     `SELECT s.*, p.nombre AS plan_nombre, p.descripcion AS plan_descripcion,
-            p.precio_mensual_usd, p.precio_anual_usd, p.limite_comprobantes_mes,
-            p.limite_usuarios, p.permite_imap_gastos, p.permite_envio_correo, p.orden
+            p.precio_mensual_crc, p.precio_anual_crc, p.precio_mensual_usd, p.precio_anual_usd,
+            p.limite_comprobantes_mes, p.limite_usuarios, p.permite_imap_gastos, p.permite_envio_correo, p.orden
      FROM subscriptions s
      JOIN plans p ON p.code = s.plan_code
      WHERE s.tenant_id = $1`,
@@ -155,6 +169,9 @@ export async function getEstadoSuscripcion(tenantId: string) {
     getGatewaysConfig()
   ]);
 
+  const precioMensualCrc = Number(row.precio_mensual_crc ?? row.precio_mensual_usd ?? 0);
+  const precioAnualCrc = Number(row.precio_anual_crc ?? row.precio_anual_usd ?? 0);
+
   return {
     subscription: {
       id: row.id,
@@ -171,8 +188,13 @@ export async function getEstadoSuscripcion(tenantId: string) {
       code: row.plan_code,
       nombre: row.plan_nombre,
       descripcion: row.plan_descripcion,
-      precio_mensual_usd: Number(row.precio_mensual_usd),
-      precio_anual_usd: Number(row.precio_anual_usd),
+      precio_mensual_crc: precioMensualCrc,
+      precio_anual_crc: precioAnualCrc,
+      precio_mensual_usd: Number(row.precio_mensual_usd || 0),
+      precio_anual_usd: Number(row.precio_anual_usd || 0),
+      moneda: 'CRC',
+      precio_mensual_formatted: formatCRC(precioMensualCrc),
+      precio_anual_formatted: formatCRC(precioAnualCrc),
       limite_comprobantes_mes: Number(row.limite_comprobantes_mes),
       limite_usuarios: Number(row.limite_usuarios),
       permite_imap_gastos: Boolean(row.permite_imap_gastos),
@@ -182,19 +204,24 @@ export async function getEstadoSuscripcion(tenantId: string) {
     usuariosActivos: Number(usersRes.rows[0]?.total || 0),
     pasarelaActiva: gateways.pasarelaActiva,
     sinpeInfo: gateways.sinpe,
-    pagos: pagosRes.rows.map(p => ({
-      id: p.id,
-      planCode: p.plan_code,
-      billingCycle: p.billing_cycle,
-      amountUsd: Number(p.amount_usd),
-      currency: p.currency,
-      provider: p.provider,
-      providerReference: p.provider_reference,
-      status: p.status,
-      notas: p.comprobante_notas,
-      createdAt: p.created_at,
-      paidAt: p.paid_at
-    }))
+    pagos: pagosRes.rows.map(p => {
+      const amountCrc = Number(p.amount_crc ?? p.amount_usd ?? 0);
+      return {
+        id: p.id,
+        planCode: p.plan_code,
+        billingCycle: p.billing_cycle,
+        amountCrc,
+        amountUsd: Number(p.amount_usd),
+        currency: p.currency || 'CRC',
+        amountFormatted: formatCRC(amountCrc),
+        provider: p.provider,
+        providerReference: p.provider_reference,
+        status: p.status,
+        notas: p.comprobante_notas,
+        createdAt: p.created_at,
+        paidAt: p.paid_at
+      };
+    })
   };
 }
 
@@ -302,7 +329,7 @@ export async function iniciarCheckoutRecurrente(
     throw new Error('Plan seleccionado no válido para suscripción de pago.');
   }
   const plan = mapPlan(planRes.rows[0]);
-  const amountUsd = billingCycle === 'yearly' ? plan.precio_anual_usd : plan.precio_mensual_usd;
+  const amountCrc = billingCycle === 'yearly' ? plan.precio_anual_crc : plan.precio_mensual_crc;
 
   const subRes = await pool.query('SELECT id FROM subscriptions WHERE tenant_id = $1', [tenantId]);
   const subscriptionId = subRes.rows[0]?.id || null;
@@ -352,18 +379,18 @@ export async function iniciarCheckoutRecurrente(
 
       const newId = crypto.randomUUID();
       await client.query(
-        `INSERT INTO payment_transactions (id, tenant_id, subscription_id, plan_code, billing_cycle, amount_usd, currency, provider, status)
-         VALUES ($1, $2, $3, $4, $5, $6, 'USD', $7, 'pending')`,
-        [newId, tenantId, subscriptionId, plan.code, billingCycle, amountUsd, provider]
+        `INSERT INTO payment_transactions (id, tenant_id, subscription_id, plan_code, billing_cycle, amount_usd, amount_crc, currency, provider, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $6, 'CRC', $7, 'pending')`,
+        [newId, tenantId, subscriptionId, plan.code, billingCycle, amountCrc, provider]
       );
       return newId;
     });
   } else {
     txId = crypto.randomUUID();
     await pool.query(
-      `INSERT INTO payment_transactions (id, tenant_id, subscription_id, plan_code, billing_cycle, amount_usd, currency, provider, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'USD', $7, 'pending')`,
-      [txId, tenantId, subscriptionId, plan.code, billingCycle, amountUsd, provider]
+      `INSERT INTO payment_transactions (id, tenant_id, subscription_id, plan_code, billing_cycle, amount_usd, amount_crc, currency, provider, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $6, 'CRC', $7, 'pending')`,
+      [txId, tenantId, subscriptionId, plan.code, billingCycle, amountCrc, provider]
     );
   }
 
@@ -375,8 +402,8 @@ export async function iniciarCheckoutRecurrente(
       success_url: `${appUrl}/?billing=success&tx=${txId}`,
       cancel_url: `${appUrl}/?billing=cancel&tx=${txId}`,
       'line_items[0][quantity]': '1',
-      'line_items[0][price_data][currency]': 'usd',
-      'line_items[0][price_data][unit_amount]': String(Math.round(amountUsd * 100)),
+      'line_items[0][price_data][currency]': 'crc',
+      'line_items[0][price_data][unit_amount]': String(Math.round(amountCrc * 100)),
       'line_items[0][price_data][recurring][interval]': billingCycle === 'yearly' ? 'year' : 'month',
       'line_items[0][price_data][product_data][name]': `${plan.nombre} (${billingCycle === 'yearly' ? 'Anual' : 'Mensual'})`,
       'metadata[transaction_id]': txId,
@@ -403,7 +430,9 @@ export async function iniciarCheckoutRecurrente(
       provider: 'stripe',
       transactionId: txId,
       checkoutUrl: stripeJson.url,
-      amountUsd,
+      amountCrc,
+      amountFormatted: formatCRC(amountCrc),
+      currency: 'CRC',
       planNombre: plan.nombre,
       billingCycle
     };
@@ -415,14 +444,14 @@ export async function iniciarCheckoutRecurrente(
       [tenantId]
     );
     const customerEmail = userRes.rows[0]?.email || undefined;
-    const amountInCents = Math.round(amountUsd * 100);
+    const amountInCents = Math.round(amountCrc * 100);
 
     const onvoPayload = {
       lineItems: [
         {
           quantity: 1,
           unitAmount: amountInCents,
-          currency: 'USD',
+          currency: 'CRC',
           description: `MeetinFact - ${plan.nombre} (${billingCycle === 'yearly' ? 'Anual' : 'Mensual'})`
         }
       ],
@@ -485,7 +514,10 @@ export async function iniciarCheckoutRecurrente(
       transactionId: txId,
       checkoutUrl: onvoJson.url,
       checkoutSessionId: onvoJson.id,
-      amountUsd,
+      amountCrc,
+      amountUsd: amountCrc,
+      amountFormatted: formatCRC(amountCrc),
+      currency: 'CRC',
       planNombre: plan.nombre,
       billingCycle
     };
@@ -513,8 +545,8 @@ export async function iniciarCheckoutRecurrente(
       body: JSON.stringify({
         redirect: `${appUrl}/?billing=tilopay&tx=${txId}`,
         key: gateways.tilopay.apiKey,
-        amount: amountUsd.toFixed(2),
-        currency: 'USD',
+        amount: amountCrc.toFixed(2),
+        currency: 'CRC',
         orderNumber: txId,
         capture: '1',
         subscription: '1'
@@ -529,7 +561,10 @@ export async function iniciarCheckoutRecurrente(
       provider: 'tilopay',
       transactionId: txId,
       checkoutUrl: payJson.url,
-      amountUsd,
+      amountCrc,
+      amountUsd: amountCrc,
+      amountFormatted: formatCRC(amountCrc),
+      currency: 'CRC',
       planNombre: plan.nombre,
       billingCycle
     };
@@ -539,7 +574,10 @@ export async function iniciarCheckoutRecurrente(
     mode: 'sandbox',
     provider: 'sandbox',
     transactionId: txId,
-    amountUsd,
+    amountCrc,
+    amountUsd: amountCrc,
+    amountFormatted: formatCRC(amountCrc),
+    currency: 'CRC',
     planNombre: plan.nombre,
     billingCycle
   };
@@ -725,17 +763,17 @@ export async function reportarPagoSinpe(
   }
 
   const plan = mapPlan(planRes.rows[0]);
-  const amountUsd = input.billingCycle === 'yearly' ? plan.precio_anual_usd : plan.precio_mensual_usd;
+  const amountCrc = input.billingCycle === 'yearly' ? plan.precio_anual_crc : plan.precio_mensual_crc;
   const subRes = await pool.query('SELECT id FROM subscriptions WHERE tenant_id = $1', [tenantId]);
   const txId = crypto.randomUUID();
 
   await pool.query(
-    `INSERT INTO payment_transactions (id, tenant_id, subscription_id, plan_code, billing_cycle, amount_usd, currency, provider, provider_reference, status, comprobante_notas)
-     VALUES ($1, $2, $3, $4, $5, $6, 'USD', 'manual_sinpe', $7, 'pending', $8)`,
-    [txId, tenantId, subRes.rows[0]?.id || null, plan.code, input.billingCycle, amountUsd, referencia, (input.notas || '').trim() || null]
+    `INSERT INTO payment_transactions (id, tenant_id, subscription_id, plan_code, billing_cycle, amount_usd, amount_crc, currency, provider, provider_reference, status, comprobante_notas)
+     VALUES ($1, $2, $3, $4, $5, $6, $6, 'CRC', 'manual_sinpe', $7, 'pending', $8)`,
+    [txId, tenantId, subRes.rows[0]?.id || null, plan.code, input.billingCycle, amountCrc, referencia, (input.notas || '').trim() || null]
   );
 
-  return { id: txId, status: 'pending', amountUsd, referencia };
+  return { id: txId, status: 'pending', amountCrc, amountUsd: amountCrc, amountFormatted: formatCRC(amountCrc), currency: 'CRC', referencia };
 }
 
 export interface OnvoWebhookEventData {
@@ -826,9 +864,12 @@ export async function confirmarPagoOnvo(
 
     // 8. Coincidencia de importe y moneda
     if (eventData.amountInCents !== undefined && eventData.amountInCents !== null) {
-      const expectedCents = Math.round(Number(tx.amount_usd) * 100);
-      if (expectedCents !== Number(eventData.amountInCents)) {
-        throw new Error(`Discrepancia de importe: esperado ${expectedCents} centavos, recibido ${eventData.amountInCents}.`);
+      const txAmount = Number(tx.amount_crc ?? tx.amount_usd);
+      const expectedCents = Math.round(txAmount * 100);
+      const expectedWhole = Math.round(txAmount);
+      const received = Number(eventData.amountInCents);
+      if (received !== expectedCents && received !== expectedWhole) {
+        throw new Error(`Discrepancia de importe: esperado ${expectedCents} (o ${expectedWhole}), recibido ${received}.`);
       }
     }
     if (eventData.currency) {
@@ -1049,13 +1090,13 @@ export async function procesarWebhook(provider: string, body: any) {
         const cycle = (metadata.billingCycle || sub.billing_cycle || 'monthly') as 'monthly' | 'yearly';
         const planRes = await pool.query('SELECT * FROM plans WHERE code = $1', [planCode]);
         const plan = planRes.rows[0];
-        const amountUsd = cycle === 'yearly' ? Number(plan?.precio_anual_usd || 0) : Number(plan?.precio_mensual_usd || 0);
+        const amountCrc = cycle === 'yearly' ? Number(plan?.precio_anual_crc || 0) : Number(plan?.precio_mensual_crc || 0);
 
         const newTxId = crypto.randomUUID();
         await pool.query(
-          `INSERT INTO payment_transactions (id, tenant_id, subscription_id, plan_code, billing_cycle, amount_usd, currency, provider, status, checkout_session_id, payment_intent_id, comprobante_notas)
-           VALUES ($1, $2, $3, $4, $5, $6, 'USD', 'onvopay', 'pending', $7, $8, $9)`,
-          [newTxId, metadata.tenantId, sub.id, planCode, cycle, amountUsd, sessionId || null, paymentIntentId || null, 'Renovación automática recurrente ONVO']
+          `INSERT INTO payment_transactions (id, tenant_id, subscription_id, plan_code, billing_cycle, amount_usd, amount_crc, currency, provider, status, checkout_session_id, payment_intent_id, comprobante_notas)
+           VALUES ($1, $2, $3, $4, $5, $6, $6, 'CRC', 'onvopay', 'pending', $7, $8, $9)`,
+          [newTxId, metadata.tenantId, sub.id, planCode, cycle, amountCrc, sessionId || null, paymentIntentId || null, 'Renovación automática recurrente ONVO']
         );
         transactionId = newTxId;
       }
@@ -1208,7 +1249,8 @@ export async function getSuperAdminDashboard() {
        ORDER BY pt.created_at DESC`
     ),
     pool.query(
-      `SELECT COALESCE(SUM(CASE WHEN s.billing_cycle = 'yearly' THEN p.precio_anual_usd / 12.0 ELSE p.precio_mensual_usd END), 0) AS mrr
+      `SELECT COALESCE(SUM(CASE WHEN s.billing_cycle = 'yearly' THEN p.precio_anual_crc / 12.0 ELSE p.precio_mensual_crc END), 0) AS mrr_crc,
+              COALESCE(SUM(CASE WHEN s.billing_cycle = 'yearly' THEN p.precio_anual_usd / 12.0 ELSE p.precio_mensual_usd END), 0) AS mrr_usd
        FROM subscriptions s
        JOIN plans p ON p.code = s.plan_code
        WHERE s.status = 'active' AND s.provider <> 'owner'`
@@ -1217,11 +1259,14 @@ export async function getSuperAdminDashboard() {
   ]);
 
   const gateways = await getGatewaysConfig();
+  const mrrCrcVal = Math.round(Number(mrrRes.rows[0]?.mrr_crc || 0));
   return {
     kpis: {
       totalTenants: tenantsRes.rowCount || 0,
       suscripcionesActivas: tenantsRes.rows.filter(r => r.status === 'active').length,
-      mrrUsd: Number(Number(mrrRes.rows[0]?.mrr || 0).toFixed(2)),
+      mrrCrc: mrrCrcVal,
+      mrrCrcFormatted: formatCRC(mrrCrcVal),
+      mrrUsd: Number(Number(mrrRes.rows[0]?.mrr_usd || 0).toFixed(2)),
       pagosPendientes: pagosPendRes.rowCount || 0
     },
     tenants: tenantsRes.rows,

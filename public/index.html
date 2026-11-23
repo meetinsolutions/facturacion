@@ -5319,6 +5319,11 @@
       renderPlanesSuscripcion();
     }
 
+    function fmtCRC(amount) {
+      const rounded = Math.round(Number(amount) || 0);
+      return '₡' + rounded.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+
     async function cargarSuscripcion() {
       const res = await fetch('/api/billing/estado');
       const json = await res.json();
@@ -5356,8 +5361,8 @@
 
       const sinpe = billingSinpe || {};
       document.getElementById('sus-sinpe').innerHTML = `
-        <h3 class="font-black text-slate-800 text-sm"><i class="fa-solid fa-mobile-screen text-emerald-600"></i> Pagar por SINPE Móvil</h3>
-        <p class="text-slate-600">Envíe el monto al <b class="font-mono">${escSaas(sinpe.numero || '')}</b> a nombre de <b>${escSaas(sinpe.titular || '')}</b> y reporte el número de comprobante. Tipo de cambio: ₡${escSaas(sinpe.tipoCambioUsd || '')}/USD. El plan se activa al ser aprobado.</p>
+        <h3 class="font-black text-slate-800 text-sm"><i class="fa-solid fa-mobile-screen text-emerald-600"></i> Pagar por SINPE Móvil (Colones)</h3>
+        <p class="text-slate-600">Envíe el monto en colones al <b class="font-mono">${escSaas(sinpe.numero || '')}</b> a nombre de <b>${escSaas(sinpe.titular || '')}</b> (${escSaas(sinpe.banco || 'SINPE Móvil')}) y reporte el número de comprobante. El plan se activa de inmediato tras ser verificado.</p>
         <div class="grid grid-cols-4 gap-3">
           <select id="sinpe-plan" class="p-2.5 border rounded-xl bg-slate-50 font-bold">
             ${billingPlanes.filter(x => x.code !== 'trial').map(x => `<option value="${escSaas(x.code)}">${escSaas(x.nombre)}</option>`).join('')}
@@ -5372,7 +5377,7 @@
       document.getElementById('sus-pagos').innerHTML = pagos.length ? `
         <table class="w-full text-left"><thead class="text-slate-500"><tr><th class="py-2">Fecha</th><th>Plan</th><th>Ciclo</th><th>Monto</th><th>Método</th><th>Referencia</th><th>Estado</th></tr></thead>
         <tbody>${pagos.map(x => `<tr class="border-t"><td class="py-2">${fmtFechaSaas(x.createdAt)}</td><td>${escSaas(x.planCode)}</td><td>${x.billingCycle === 'yearly' ? 'Anual' : 'Mensual'}</td>
-          <td class="font-mono">$${Number(x.amountUsd).toFixed(2)}</td><td>${escSaas(x.provider)}</td><td class="font-mono">${escSaas(x.providerReference || '')}</td>
+          <td class="font-mono">${fmtCRC(x.amountCrc ?? x.amountUsd)}</td><td>${escSaas(x.provider)}</td><td class="font-mono">${escSaas(x.providerReference || '')}</td>
           <td><span class="px-2 py-0.5 rounded-full font-bold ${stPago[x.status] || 'bg-slate-100'}">${escSaas(x.status)}</span></td></tr>`).join('')}</tbody></table>`
         : '<p class="text-slate-500">Sin pagos registrados.</p>';
     }
@@ -5380,12 +5385,12 @@
     function renderPlanesSuscripcion() {
       const actual = currentBilling?.plan?.code;
       document.getElementById('sus-planes').innerHTML = billingPlanes.filter(p => p.code !== 'trial').map(p => {
-        const precio = cicloFacturacion === 'yearly' ? p.precio_anual_usd : p.precio_mensual_usd;
+        const precio = cicloFacturacion === 'yearly' ? (p.precio_anual_crc ?? p.precio_anual_usd) : (p.precio_mensual_crc ?? p.precio_mensual_usd);
         const esActual = p.code === actual;
         return `<div class="bg-white p-5 rounded-2xl border ${esActual ? 'border-emerald-500 ring-2 ring-emerald-200' : 'border-slate-200'} shadow-sm text-xs flex flex-col">
           <div class="font-black text-slate-800 text-base">${escSaas(p.nombre)}</div>
           <div class="text-slate-500 min-h-[32px]">${escSaas(p.descripcion || '')}</div>
-          <div class="my-3"><span class="text-3xl font-black text-slate-900">$${Number(precio).toFixed(2)}</span><span class="text-slate-500"> / ${cicloFacturacion === 'yearly' ? 'año' : 'mes'}</span></div>
+          <div class="my-3"><span class="text-3xl font-black text-slate-900">${fmtCRC(precio)}</span><span class="text-slate-500"> / ${cicloFacturacion === 'yearly' ? 'año' : 'mes'}</span></div>
           <ul class="space-y-1 text-slate-600 flex-1">
             <li><i class="fa-solid fa-check text-emerald-600"></i> ${p.limite_comprobantes_mes === -1 ? 'Comprobantes ilimitados' : p.limite_comprobantes_mes + ' comprobantes/mes'}</li>
             <li><i class="fa-solid fa-check text-emerald-600"></i> ${p.limite_usuarios === -1 ? 'Usuarios ilimitados' : p.limite_usuarios + ' usuario(s)'}</li>
@@ -5415,7 +5420,8 @@
         return;
       }
       if (d.mode === 'sandbox') {
-        if (!confirm(`MODO SANDBOX (pruebas)\n\nPlan: ${d.planNombre}\nMonto: $${Number(d.amountUsd).toFixed(2)} (${d.billingCycle === 'yearly' ? 'anual' : 'mensual'})\n\n¿Simular pago aprobado?`)) return;
+        const montoStr = d.amountFormatted || fmtCRC(d.amountCrc || d.amountUsd);
+        if (!confirm(`MODO SANDBOX (pruebas)\n\nPlan: ${d.planNombre}\nMonto: ${montoStr} (${d.billingCycle === 'yearly' ? 'anual' : 'mensual'})\n\n¿Simular pago aprobado?`)) return;
         const r2 = await fetch('/api/billing/sandbox/confirmar', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ transactionId: d.transactionId })
@@ -5522,16 +5528,17 @@
       if (!json.success) return;
       const d = json.data;
       const kpi = (t, v, i, c) => `<div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm"><div class="text-[11px] text-slate-500 font-bold uppercase"><i class="fa-solid ${i} ${c}"></i> ${t}</div><div class="text-2xl font-black text-slate-800 mt-1">${v}</div></div>`;
+      const mrrFormatted = d.kpis.mrrCrcFormatted || fmtCRC(d.kpis.mrrCrc || d.kpis.mrrUsd);
       document.getElementById('sa-kpis').innerHTML =
         kpi('Empresas', d.kpis.totalTenants, 'fa-building', 'text-slate-500') +
         kpi('Suscripciones activas', d.kpis.suscripcionesActivas, 'fa-circle-check', 'text-emerald-600') +
-        kpi('MRR (USD)', '$' + Number(d.kpis.mrrUsd).toFixed(2), 'fa-sack-dollar', 'text-indigo-600') +
+        kpi('MRR (CRC)', mrrFormatted, 'fa-sack-dollar', 'text-indigo-600') +
         kpi('Pagos pendientes', d.kpis.pagosPendientes, 'fa-hourglass-half', 'text-amber-600');
 
       document.getElementById('sa-pagos').innerHTML = d.pagosPendientes.length ? `
         <table class="w-full text-left"><thead class="text-slate-500"><tr><th class="py-2">Fecha</th><th>Empresa</th><th>Plan</th><th>Monto</th><th>Referencia</th><th>Notas</th><th></th></tr></thead>
         <tbody>${d.pagosPendientes.map(p => `<tr class="border-t"><td class="py-2">${fmtFechaSaas(p.created_at)}</td><td class="font-bold">${escSaas(p.tenant_nombre)}</td>
-          <td>${escSaas(p.plan_nombre)} (${p.billing_cycle === 'yearly' ? 'anual' : 'mensual'})</td><td class="font-mono">$${Number(p.amount_usd).toFixed(2)}</td>
+          <td>${escSaas(p.plan_nombre)} (${p.billing_cycle === 'yearly' ? 'anual' : 'mensual'})</td><td class="font-mono">${fmtCRC(p.amount_crc ?? p.amount_usd)}</td>
           <td class="font-mono">${escSaas(p.provider_reference)}</td><td>${escSaas(p.comprobante_notas || '')}</td>
           <td class="text-right space-x-2"><button onclick="saPago('${p.id}', 'aprobar')" class="px-2 py-1 bg-emerald-600 text-white rounded-lg font-bold">Aprobar</button>
           <button onclick="saPago('${p.id}', 'rechazar')" class="px-2 py-1 bg-rose-600 text-white rounded-lg font-bold">Rechazar</button></td></tr>`).join('')}</tbody></table>`

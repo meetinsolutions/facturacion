@@ -29,7 +29,8 @@ import {
   getEstadoSuscripcion,
   listarPlanes,
   getGatewaysConfig,
-  isSandboxPermitted
+  isSandboxPermitted,
+  formatCRC
 } from '../src/services/billing-service.js';
 
 const TEST_DB = 'facturacion_test';
@@ -129,9 +130,9 @@ async function runCommercialSuite() {
     });
 
     // ----------------------------------------------------------------
-    // PRUEBA 2: CATÁLOGO DE PLANES Y LÍMITES
+    // PRUEBA 2: CATÁLOGO DE PLANES Y PRECIOS EN COLONES (CRC)
     // ----------------------------------------------------------------
-    await test('2. Catálogo de planes expone límites y características diferenciadas', async () => {
+    await test('2. Catálogo de planes expone tarifas aprobadas en CRC y formato costarricense', async () => {
       const planes = await listarPlanes();
       assert(planes.length >= 4, 'Deben existir al menos 4 planes');
 
@@ -140,6 +141,20 @@ async function runCommercialSuite() {
       const empresarial = planes.find(p => p.code === 'empresarial');
 
       assert(emprendedor && pro && empresarial, 'Planes esenciales deben existir');
+      assert.strictEqual(emprendedor.precio_mensual_crc, 6900);
+      assert.strictEqual(emprendedor.precio_anual_crc, 69000);
+      assert.strictEqual(pro.precio_mensual_crc, 12900);
+      assert.strictEqual(pro.precio_anual_crc, 129000);
+      assert.strictEqual(empresarial.precio_mensual_crc, 34900);
+      assert.strictEqual(empresarial.precio_anual_crc, 349000);
+
+      // Verificación de formato oficial costarricense (punto como separador de miles, sin decimales)
+      assert.strictEqual(formatCRC(6900), '₡6.900');
+      assert.strictEqual(formatCRC(12900), '₡12.900');
+      assert.strictEqual(formatCRC(34900), '₡34.900');
+      assert.strictEqual(formatCRC(129000), '₡129.000');
+      assert.strictEqual(formatCRC(349000), '₡349.000');
+
       assert.strictEqual(emprendedor.limite_comprobantes_mes, 100);
       assert.strictEqual(emprendedor.permite_imap_gastos, false);
       assert.strictEqual(pro.limite_comprobantes_mes, -1); // ilimitado
@@ -148,9 +163,9 @@ async function runCommercialSuite() {
     });
 
     // ----------------------------------------------------------------
-    // PRUEBA 3: PAGO CONFIRMADO ONVO SANDBOX
+    // PRUEBA 3: PAGO CONFIRMADO ONVO SANDBOX EN CRC
     // ----------------------------------------------------------------
-    await test('3. Pago confirmado ONVO Sandbox activa suscripción mensual y programa fecha fin exacta', async () => {
+    await test('3. Pago confirmado ONVO Sandbox en CRC activa suscripción mensual y programa fecha fin exacta', async () => {
       const fixture = await crearTenantFixture('onvo-pay');
       tenantsCreados.push(fixture.tenantId);
 
@@ -159,8 +174,8 @@ async function runCommercialSuite() {
       const paymentIntentId = `pi_test_${crypto.randomBytes(8).toString('hex')}`;
 
       await pool.query(
-        `INSERT INTO payment_transactions (id, tenant_id, subscription_id, plan_code, billing_cycle, amount_usd, currency, provider, status, checkout_session_id)
-         VALUES ($1, $2, $3, 'pro', 'monthly', 10.00, 'USD', 'onvopay', 'pending', $4)`,
+        `INSERT INTO payment_transactions (id, tenant_id, subscription_id, plan_code, billing_cycle, amount_usd, amount_crc, currency, provider, status, checkout_session_id)
+         VALUES ($1, $2, $3, 'pro', 'monthly', 12900.00, 12900.00, 'CRC', 'onvopay', 'pending', $4)`,
         [txId, fixture.tenantId, fixture.subId, sessionId]
       );
 
@@ -173,8 +188,8 @@ async function runCommercialSuite() {
         tenantId: fixture.tenantId,
         planCode: 'pro',
         billingCycle: 'monthly',
-        amountInCents: 1000,
-        currency: 'USD'
+        amountInCents: 1290000,
+        currency: 'CRC'
       });
 
       assert.strictEqual(result.alreadyPaid, false);
@@ -187,6 +202,7 @@ async function runCommercialSuite() {
 
       const tx = await pool.query('SELECT * FROM payment_transactions WHERE id = $1', [txId]);
       assert.strictEqual(tx.rows[0].status, 'paid');
+      assert.strictEqual(tx.rows[0].currency, 'CRC');
       assert(tx.rows[0].paid_at !== null);
       assert.strictEqual(tx.rows[0].payment_intent_id, paymentIntentId);
     });
@@ -238,8 +254,8 @@ async function runCommercialSuite() {
       const sessionId = `cs_test_idem_${Date.now()}`;
 
       await pool.query(
-        `INSERT INTO payment_transactions (id, tenant_id, subscription_id, plan_code, billing_cycle, amount_usd, currency, provider, status, checkout_session_id)
-         VALUES ($1, $2, $3, 'emprendedor', 'monthly', 15.00, 'USD', 'onvopay', 'pending', $4)`,
+        `INSERT INTO payment_transactions (id, tenant_id, subscription_id, plan_code, billing_cycle, amount_usd, amount_crc, currency, provider, status, checkout_session_id)
+         VALUES ($1, $2, $3, 'emprendedor', 'monthly', 6900.00, 6900.00, 'CRC', 'onvopay', 'pending', $4)`,
         [txId, fixture.tenantId, fixture.subId, sessionId]
       );
 
@@ -252,8 +268,8 @@ async function runCommercialSuite() {
         tenantId: fixture.tenantId,
         planCode: 'emprendedor',
         billingCycle: 'monthly',
-        amountInCents: 1500,
-        currency: 'USD'
+        amountInCents: 690000,
+        currency: 'CRC'
       };
 
       // Ejecutar dos confirmaciones concurrentes
@@ -418,8 +434,8 @@ async function runCommercialSuite() {
         data: {
           object: {
             id: paymentIntentId,
-            amount: 1000,
-            currency: 'USD',
+            amount: 1290000,
+            currency: 'CRC',
             status: 'succeeded',
             metadata: {
               tenantId: fixture.tenantId,

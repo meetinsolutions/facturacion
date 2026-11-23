@@ -162,8 +162,11 @@ export async function initDatabaseSchema(): Promise<void> {
       code TEXT PRIMARY KEY,
       nombre TEXT NOT NULL,
       descripcion TEXT NOT NULL,
-      precio_mensual_usd NUMERIC(10,2) NOT NULL,
-      precio_anual_usd NUMERIC(10,2) NOT NULL,
+      precio_mensual_crc NUMERIC(12,2) NOT NULL DEFAULT 0,
+      precio_anual_crc NUMERIC(12,2) NOT NULL DEFAULT 0,
+      precio_mensual_usd NUMERIC(10,2) NOT NULL DEFAULT 0,
+      precio_anual_usd NUMERIC(10,2) NOT NULL DEFAULT 0,
+      moneda TEXT NOT NULL DEFAULT 'CRC',
       limite_comprobantes_mes INTEGER NOT NULL,
       limite_usuarios INTEGER NOT NULL,
       permite_imap_gastos BOOLEAN NOT NULL DEFAULT FALSE,
@@ -171,6 +174,10 @@ export async function initDatabaseSchema(): Promise<void> {
       activo BOOLEAN NOT NULL DEFAULT TRUE,
       orden INTEGER NOT NULL DEFAULT 0
     );
+
+    ALTER TABLE plans ADD COLUMN IF NOT EXISTS precio_mensual_crc NUMERIC(12,2) DEFAULT 0;
+    ALTER TABLE plans ADD COLUMN IF NOT EXISTS precio_anual_crc NUMERIC(12,2) DEFAULT 0;
+    ALTER TABLE plans ADD COLUMN IF NOT EXISTS moneda TEXT DEFAULT 'CRC';
 
     CREATE TABLE IF NOT EXISTS subscriptions (
       id UUID PRIMARY KEY,
@@ -195,7 +202,8 @@ export async function initDatabaseSchema(): Promise<void> {
       plan_code TEXT NOT NULL REFERENCES plans(code),
       billing_cycle TEXT NOT NULL DEFAULT 'monthly',
       amount_usd NUMERIC(10,2) NOT NULL,
-      currency TEXT NOT NULL DEFAULT 'USD',
+      amount_crc NUMERIC(12,2),
+      currency TEXT NOT NULL DEFAULT 'CRC',
       provider TEXT NOT NULL,
       provider_reference TEXT,
       status TEXT NOT NULL DEFAULT 'pending',
@@ -203,6 +211,8 @@ export async function initDatabaseSchema(): Promise<void> {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       paid_at TIMESTAMPTZ
     );
+    ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS amount_crc NUMERIC(12,2);
+    ALTER TABLE payment_transactions ALTER COLUMN currency SET DEFAULT 'CRC';
     CREATE INDEX IF NOT EXISTS idx_payment_transactions_tenant ON payment_transactions(tenant_id, created_at DESC);
 
     CREATE TABLE IF NOT EXISTS platform_settings (
@@ -217,8 +227,10 @@ export async function initDatabaseSchema(): Promise<void> {
       code: 'trial',
       nombre: 'Prueba Gratis 14 Días',
       descripcion: 'Prueba completa con envío PDF+XML y Control de Gastos IMAP (hasta 5 comprobantes).',
-      mensual: 0,
-      anual: 0,
+      mensualCrc: 0,
+      anualCrc: 0,
+      mensualUsd: 0,
+      anualUsd: 0,
       limiteComp: 5,
       limiteUsers: 1,
       imap: true,
@@ -229,8 +241,10 @@ export async function initDatabaseSchema(): Promise<void> {
       code: 'emprendedor',
       nombre: 'Plan Emprendedor',
       descripcion: 'Hasta 100 comprobantes mensuales, catálogo de productos/clientes y envío PDF+XML.',
-      mensual: 15,
-      anual: 150,
+      mensualCrc: 6900,
+      anualCrc: 69000,
+      mensualUsd: 15,
+      anualUsd: 150,
       limiteComp: 100,
       limiteUsers: 2,
       imap: false,
@@ -241,8 +255,10 @@ export async function initDatabaseSchema(): Promise<void> {
       code: 'pro',
       nombre: 'Plan Profesional',
       descripcion: 'Comprobantes ilimitados, múltiples usuarios y Control de Gastos IMAP automático.',
-      mensual: 35,
-      anual: 350,
+      mensualCrc: 12900,
+      anualCrc: 129000,
+      mensualUsd: 25,
+      anualUsd: 250,
       limiteComp: -1,
       limiteUsers: 5,
       imap: true,
@@ -253,8 +269,10 @@ export async function initDatabaseSchema(): Promise<void> {
       code: 'empresarial',
       nombre: 'Plan Empresarial',
       descripcion: 'Comprobantes ilimitados, hasta 20 usuarios y todas las automatizaciones fiscales.',
-      mensual: 75,
-      anual: 750,
+      mensualCrc: 34900,
+      anualCrc: 349000,
+      mensualUsd: 75,
+      anualUsd: 750,
       limiteComp: -1,
       limiteUsers: 20,
       imap: true,
@@ -265,10 +283,13 @@ export async function initDatabaseSchema(): Promise<void> {
 
   for (const p of planesDefault) {
     await pool.query(
-      `INSERT INTO plans (code, nombre, descripcion, precio_mensual_usd, precio_anual_usd, limite_comprobantes_mes, limite_usuarios, permite_imap_gastos, permite_envio_correo, activo, orden)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,TRUE,$10)
-       ON CONFLICT (code) DO NOTHING`,
-      [p.code, p.nombre, p.descripcion, p.mensual, p.anual, p.limiteComp, p.limiteUsers, p.imap, p.correo, p.orden]
+      `INSERT INTO plans (code, nombre, descripcion, precio_mensual_crc, precio_anual_crc, precio_mensual_usd, precio_anual_usd, moneda, limite_comprobantes_mes, limite_usuarios, permite_imap_gastos, permite_envio_correo, activo, orden)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'CRC',$8,$9,$10,$11,TRUE,$12)
+       ON CONFLICT (code) DO UPDATE
+       SET precio_mensual_crc = EXCLUDED.precio_mensual_crc,
+           precio_anual_crc = EXCLUDED.precio_anual_crc,
+           moneda = 'CRC'`,
+      [p.code, p.nombre, p.descripcion, p.mensualCrc, p.anualCrc, p.mensualUsd, p.anualUsd, p.limiteComp, p.limiteUsers, p.imap, p.correo, p.orden]
     );
   }
 }

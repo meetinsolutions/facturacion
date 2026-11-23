@@ -236,3 +236,75 @@ export async function enviarComprobantePorCorreo(params: {
     destinatario: destLimpio
   };
 }
+
+export async function enviarNotificacionSuscripcionActivada(
+  cfg: ConfigCorreo,
+  destinatario: string,
+  datos: {
+    empresaNombre: string;
+    planNombre: string;
+    ciclo: 'monthly' | 'yearly';
+    montoCrcFormateado: string;
+    fechaVencimientoTexto: string;
+    medioPago: string;
+    referencia?: string;
+  }
+) {
+  const destLimpio = (destinatario || '').trim();
+  if (!EMAIL_REGEX.test(destLimpio)) {
+    throw new Error(`Dirección de correo destinatario inválida: "${destinatario}"`);
+  }
+
+  const asunto = `Confirmación de Suscripción MeetinFact — ${datos.planNombre}`;
+  const htmlBody = `
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.5;color:#1e293b;padding:24px 12px;background:#f1f5f9;">
+      <div style="max-width:540px;margin:0 auto;background:#ffffff;border-radius:16px;border:1px solid #e2e8f0;overflow:hidden;box-shadow:0 4px 6px -1px rgba(0,0,0,0.05);">
+        <div style="background:linear-gradient(135deg,#059669,#0d9488);padding:24px;text-align:center;">
+          <h1 style="color:#ffffff;font-size:20px;font-weight:900;margin:0;">MeetinFact</h1>
+          <p style="color:#ccfbf1;font-size:12px;margin:4px 0 0;font-weight:600;">Suscripción Comercial Activada</p>
+        </div>
+        <div style="padding:24px;">
+          <h2 style="font-size:16px;color:#0f172a;margin:0 0 12px;">¡Su suscripción ha sido confirmada con éxito!</h2>
+          <p style="font-size:13px;color:#475569;margin:0 0 18px;">
+            Estimado(a) <strong>${escapeHtml(datos.empresaNombre)}</strong>, le confirmamos la activación de su plan comercial en MeetinFact.
+          </p>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;font-size:12px;">
+            <table style="width:100%;border-collapse:collapse;">
+              <tr>
+                <td style="padding:4px 0;color:#64748b;">Plan contratado:</td>
+                <td style="padding:4px 0;text-align:right;font-weight:700;color:#0f172a;">${escapeHtml(datos.planNombre)}</td>
+              </tr>
+              <tr>
+                <td style="padding:4px 0;color:#64748b;">Ciclo de cobro:</td>
+                <td style="padding:4px 0;text-align:right;font-weight:700;color:#0f172a;">${datos.ciclo === 'yearly' ? 'Anual' : 'Mensual'}</td>
+              </tr>
+              <tr>
+                <td style="padding:4px 0;color:#64748b;">Monto abonado:</td>
+                <td style="padding:4px 0;text-align:right;font-weight:900;font-size:15px;color:#059669;">${escapeHtml(datos.montoCrcFormateado)}</td>
+              </tr>
+              <tr>
+                <td style="padding:4px 0;color:#64748b;">Medio de pago:</td>
+                <td style="padding:4px 0;text-align:right;color:#0f172a;">${escapeHtml(datos.medioPago)} ${datos.referencia ? `(${escapeHtml(datos.referencia)})` : ''}</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0 0;color:#0f172a;font-weight:700;border-top:1px solid #e2e8f0;">Vigente hasta:</td>
+                <td style="padding:8px 0 0;text-align:right;font-weight:700;color:#0f172a;border-top:1px solid #e2e8f0;">${escapeHtml(datos.fechaVencimientoTexto)}</td>
+              </tr>
+            </table>
+          </div>
+          <p style="margin:20px 0 0;font-size:12px;color:#64748b;text-align:center;">
+            Gracias por confiar en MeetinFact para su facturación electrónica en Costa Rica.
+          </p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const transporter = crearTransporter(cfg);
+  return await transporter.sendMail({
+    from: `"${cfg.nombreRemitente}" <${cfg.usuario}>`,
+    to: destLimpio,
+    subject: asunto,
+    html: htmlBody
+  });
+}
