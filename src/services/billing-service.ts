@@ -1248,7 +1248,7 @@ export async function asignarPlanManual(
 
 export async function aprobarPagoManual(txId: string, adminInfo?: { userId?: string; email?: string }) {
   const result = await completarPagoYActivarSuscripcion(txId, 'manual_sinpe');
-  if (adminInfo) {
+  if (adminInfo && !result.alreadyPaid) {
     const auditMsg = `[AUDITORÍA] Pago aprobado por administrador: ${adminInfo.email || adminInfo.userId || 'superadmin'} (${new Date().toISOString()})`;
     await pool.query(
       `UPDATE payment_transactions
