@@ -384,9 +384,20 @@ export async function iniciarCheckoutRecurrente(
   const requested = providerOverride || gateways.pasarelaActiva || 'sandbox';
   const provider = requested;
 
-  // 1. Validación estricta de pasarelas reales: rechazo explícito si faltan credenciales (cero degradación silenciosa a sandbox)
-  if (provider === 'onvopay' && !gateways.onvopay.secretKey) {
-    throw new Error('La pasarela de pago Onvo Pay no se encuentra configurada en el sistema. Contacte al administrador.');
+  // 1. Validación estricta de pasarelas reales: rechazo explícito si faltan credenciales o autorización
+  if (provider === 'onvopay') {
+    const onvoEnv = (process.env.ONVO_ENVIRONMENT || process.env.ONVO_ENV || '').toLowerCase();
+    const isLive = onvoEnv === 'live' || gateways.onvopay.secretKey.includes('_live_') || gateways.onvopay.secretKey.startsWith('sk_live_');
+    if (isLive) {
+      if (!gateways.onvopay.secretKey || !gateways.onvopay.secretKey.includes('_live_')) {
+        throw new Error('Operación ONVO LIVE rechazada: no se dispone de credenciales API LIVE autorizadas.');
+      }
+      if (!gateways.onvopay.webhookSecret) {
+        throw new Error('Operación ONVO LIVE rechazada: el secreto de webhook LIVE (ONVO_WEBHOOK_SECRET_LIVE) no está configurado.');
+      }
+    } else if (!gateways.onvopay.secretKey) {
+      throw new Error('La pasarela de pago Onvo Pay no se encuentra configurada en el sistema. Contacte al administrador.');
+    }
   }
   if (provider === 'stripe' && !gateways.stripe.secretKey) {
     throw new Error('La pasarela de pago Stripe no se encuentra configurada en el sistema. Contacte al administrador.');
@@ -874,6 +885,14 @@ export async function confirmarPagoOnvo(
       throw new Error(`No se puede confirmar una transacción en estado '${tx.status}'.`);
     }
 
+    // Validación de seguridad para pasarela ONVO en modo LIVE: requiere secreto LIVE configurado
+    const gateways = await getGatewaysConfig();
+    const onvoEnv = (process.env.ONVO_ENVIRONMENT || process.env.ONVO_ENV || '').toLowerCase();
+    const isLive = onvoEnv === 'live' || gateways.onvopay.secretKey.includes('_live_') || gateways.onvopay.secretKey.startsWith('sk_live_');
+    if (isLive && !gateways.onvopay.webhookSecret) {
+      throw new Error('Activación de suscripción ONVO LIVE rechazada: secreto de webhook LIVE no configurado.');
+    }
+
     // 5. Certificación rigurosa de fondos efectivamente cobrados (FASE 3)
     // Para checkout_session: paymentStatus DEBE certificar 'paid'.
     // Para payment_intent: status DEBE ser 'succeeded' o 'paid'.
@@ -1061,6 +1080,10 @@ export async function procesarWebhook(provider: string, body: any) {
     const secretKey = gateways.onvopay.secretKey || '';
     const isLiveConfigured = secretKey.includes('_live_') || secretKey.startsWith('sk_live_') || secretKey.startsWith('onvo_live_');
     const configuredEnv = isLiveConfigured ? 'live' : 'test';
+
+    if (configuredEnv === 'live' && !gateways.onvopay.webhookSecret) {
+      throw new Error('Operación ONVO LIVE rechazada: no se ha configurado el secreto de webhook oficial para producción (ONVO_WEBHOOK_SECRET_LIVE).');
+    }
 
     const obj = body?.data?.object || body?.data || {};
     const metadata = obj?.metadata || body?.metadata || {};
@@ -1274,6 +1297,11 @@ export async function procesarWebhook(provider: string, body: any) {
 // FASE 4: Conciliación activa de transacciones pendientes inciertas
 export async function conciliarTransaccionesOnvoPendientes() {
   const gateways = await getGatewaysConfig();
+  const onvoEnv = (process.env.ONVO_ENVIRONMENT || process.env.ONVO_ENV || '').toLowerCase();
+  const isLive = onvoEnv === 'live' || gateways.onvopay.secretKey.includes('_live_') || gateways.onvopay.secretKey.startsWith('sk_live_');
+  if (isLive && (!gateways.onvopay.secretKey.includes('_live_') || !gateways.onvopay.webhookSecret)) {
+    return { reconciled: 0, reason: 'ONVO LIVE no autorizado o sin secreto de webhook configurado' };
+  }
   if (!gateways.onvopay.secretKey) {
     return { reconciled: 0, reason: 'ONVO secretKey no configurada' };
   }
