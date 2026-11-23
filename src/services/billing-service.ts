@@ -1026,16 +1026,25 @@ export async function procesarWebhook(provider: string, body: any) {
     const obj = body?.data?.object || body?.data || {};
     const metadata = obj?.metadata || body?.metadata || {};
 
-    const eventLivemode = body?.livemode !== undefined ? Boolean(body.livemode) :
-                          (obj?.livemode !== undefined ? Boolean(obj.livemode) : undefined);
+    // ONVO documenta 'mode: "test" | "live"' en el envelope del evento. También soporta 'livemode: boolean'.
+    const rawMode = String(body?.mode || obj?.mode || '').toLowerCase();
+    const eventLivemode = rawMode === 'live' ? true :
+                          rawMode === 'test' ? false :
+                          (body?.livemode !== undefined ? Boolean(body.livemode) :
+                          (obj?.livemode !== undefined ? Boolean(obj.livemode) : undefined));
 
     if (eventLivemode !== undefined) {
       if (configuredEnv === 'live' && !eventLivemode) {
-        throw new Error('Ambiente inválido: Se rechazó un evento de pruebas (livemode: false) porque el servidor está configurado para ONVO LIVE.');
+        throw new Error('Ambiente inválido: Se rechazó un evento de pruebas (mode/livemode: test) porque el servidor está configurado para ONVO LIVE.');
       }
       if (configuredEnv === 'test' && eventLivemode) {
-        throw new Error('Ambiente inválido: Se rechazó un evento LIVE (livemode: true) porque el servidor está configurado para ONVO Sandbox.');
+        throw new Error('Ambiente inválido: Se rechazó un evento LIVE (mode/livemode: live) porque el servidor está configurado para ONVO Sandbox.');
       }
+    }
+
+    // Respuesta inmediata a prueba de conexión desde el Dashboard de ONVO
+    if (normalizedType === 'webhook-endpoint.test' || normalizedType === 'webhook_endpoint.test') {
+      return { received: true, test: true, message: 'ONVO Webhook test connection successful' };
     }
 
     // Eventos soportados para confirmación
@@ -1045,7 +1054,12 @@ export async function procesarWebhook(provider: string, body: any) {
       normalizedType === 'checkout-session.completed' ||
       normalizedType === 'checkout-session-completed'
     );
-    const isPaymentIntentSuccess = (normalizedType === 'payment-intent.succeeded' || normalizedType === 'payment-intent-succeeded');
+    const isPaymentIntentSuccess = (
+      normalizedType === 'payment-intent.succeeded' ||
+      normalizedType === 'payment-intent-succeeded' ||
+      normalizedType === 'subscription-renewal.succeeded' ||
+      normalizedType === 'subscription-renewal-succeeded'
+    );
 
     if (!isCheckoutSuccess && !isPaymentIntentSuccess) {
       if (normalizedType.includes('failed') || normalizedType.includes('canceled')) {

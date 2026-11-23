@@ -179,7 +179,7 @@ async function runOnvoLivePrepTests() {
       [txId, tenantId, subRes.rows[0]?.id || null, sessionId]
     );
 
-    // En QA el servidor tiene configurada la secretKey de Sandbox ('onvo_test_...').
+    // 4.1 En QA el servidor tiene configurada la secretKey de Sandbox ('onvo_test_...').
     // Si recibe un webhook con 'livemode: true', DEBE ser rechazado de forma tajante.
     let cruceLiveRechazado = false;
     try {
@@ -199,11 +199,41 @@ async function runOnvoLivePrepTests() {
         }
       });
     } catch (e: any) {
-      cruceLiveRechazado = e.message.includes('livemode: true') || e.message.includes('Sandbox');
+      cruceLiveRechazado = e.message.includes('live') || e.message.includes('Sandbox');
     }
     assert(cruceLiveRechazado, 'El webhook con livemode: true DEBE ser rechazado en entorno Sandbox');
 
-    record(4, 'Aislamiento Estricto Sandbox vs LIVE', true, 'Eventos con livemode no coincidente con el entorno son bloqueados de forma inmediata.');
+    // 4.2 Verificación con envelope oficial ONVO mode: 'live'
+    let cruceModeLiveRechazado = false;
+    try {
+      await procesarWebhook('onvopay', {
+        type: 'checkout_session.completed',
+        mode: 'live', // Formato oficial ONVO
+        data: {
+          object: {
+            id: sessionId,
+            paymentIntent: `pi_live_mode_${ts}`,
+            status: 'paid',
+            paymentStatus: 'paid',
+            amountTotal: 690000,
+            currency: 'CRC',
+            metadata: { transactionId: txId, tenantId, planCode: 'emprendedor', billingCycle: 'monthly' }
+          }
+        }
+      });
+    } catch (e: any) {
+      cruceModeLiveRechazado = e.message.includes('live') || e.message.includes('Sandbox');
+    }
+    assert(cruceModeLiveRechazado, 'El webhook con mode: live DEBE ser rechazado en entorno Sandbox');
+
+    // 4.3 Verificación de respuesta a prueba de conexión del dashboard ONVO
+    const testPingRes = await procesarWebhook('onvopay', {
+      type: 'webhook_endpoint.test',
+      mode: 'test'
+    });
+    assert(testPingRes.received === true && testPingRes.test === true, 'Evento webhook_endpoint.test debe ser respondido favorablemente');
+
+    record(4, 'Aislamiento Estricto Sandbox vs LIVE', true, 'Eventos con mode/livemode discrepantes son rechazados y prueba ping responde 200.');
   } catch (err: any) {
     record(4, 'Aislamiento Estricto Sandbox vs LIVE', false, err.message);
     throw err;
