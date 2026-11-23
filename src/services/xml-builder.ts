@@ -202,9 +202,9 @@ export function generarXMLFactura(doc: ComprobanteElectronico, secuencia: number
   for (const item of doc.lineas) {
     const linea = detalleServicio.ele('LineaDetalle');
     linea.ele('NumeroLinea').txt(item.numeroLinea.toString()).up();
-    linea.ele('CodigoCABYS').txt(item.codigoCabys).up();
+    linea.ele('Codigo').txt(item.codigoCabys).up();
     if (item.codigoInterno) {
-      const cod = linea.ele('Codigo');
+      const cod = linea.ele('CodigoComercial');
       cod.ele('Tipo').txt('04').up(); // 04 = Código interno del vendedor
       cod.ele('Codigo').txt(item.codigoInterno).up();
     }
@@ -249,13 +249,11 @@ export function generarXMLFactura(doc: ComprobanteElectronico, secuencia: number
   if (doc.resumen.codigoMoneda) {
     const codMoneda = resumen.ele('CodigoTipoMoneda');
     codMoneda.ele('CodigoMoneda').txt(doc.resumen.codigoMoneda).up();
-    if (doc.resumen.tipoCambio) {
-      codMoneda.ele('TipoCambio').txt(formatoMonto(doc.resumen.tipoCambio, 5)).up();
-    }
+    codMoneda.ele('TipoCambio').txt(formatoMonto(doc.resumen.tipoCambio || 1, 5)).up();
   }
 
-  resumen.ele('TotalServiciosGravados').txt(formatoMonto(doc.resumen.totalServiciosGravados, 5)).up();
-  resumen.ele('TotalServiciosExentos').txt(formatoMonto(doc.resumen.totalServiciosExentos, 5)).up();
+  resumen.ele('TotalServGravados').txt(formatoMonto(doc.resumen.totalServiciosGravados, 5)).up();
+  resumen.ele('TotalServExentos').txt(formatoMonto(doc.resumen.totalServiciosExentos, 5)).up();
   resumen.ele('TotalMercanciasGravadas').txt(formatoMonto(doc.resumen.totalMercanciasGravadas, 5)).up();
   resumen.ele('TotalMercanciasExentas').txt(formatoMonto(doc.resumen.totalMercanciasExentas, 5)).up();
   resumen.ele('TotalGravado').txt(formatoMonto(doc.resumen.totalGravado, 5)).up();

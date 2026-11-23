@@ -161,7 +161,7 @@ async function runTaxSuite() {
       assert(xml.includes('<FacturaElectronica xmlns="https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.3/facturaElectronica"'));
       assert(xml.includes(`<Clave>${clave}</Clave>`));
       assert(xml.includes(`<NumeroConsecutivo>${consecutivo}</NumeroConsecutivo>`));
-      assert(xml.includes('<CodigoCABYS>8314100000000</CodigoCABYS>'));
+      assert(xml.includes('<Codigo>8314100000000</Codigo>'));
       assert(xml.includes('<TotalComprobante>113000.00000</TotalComprobante>'));
       assert(xml.includes('<FechaEmision>2026-11-23T10:00:00-06:00</FechaEmision>'));
     });

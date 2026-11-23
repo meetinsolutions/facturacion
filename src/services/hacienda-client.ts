@@ -39,10 +39,16 @@ export class HaciendaClient {
     this.config = config;
 
     if (config.entorno === 'produccion') {
+      if (process.env.NODE_ENV !== 'production' || process.env.ALLOW_HACIENDA_PROD !== 'true') {
+        throw new Error(
+          '[SALVAGUARDA ANTI-PRODUCCIÓN] Bloqueo de seguridad: Se intentó configurar Hacienda en modo "produccion" ' +
+          'en un entorno de prueba/QA o sin autorización explícita (ALLOW_HACIENDA_PROD=true). Operación cancelada.'
+        );
+      }
       this.idpUrl = 'https://idp.comprobanteselectronicos.go.cr/auth/realms/rut/protocol/openid-connect/token';
       this.apiUrl = 'https://api.comprobanteselectronicos.go.cr/recepcion/v1';
     } else {
-      // Staging / Pruebas
+      // Staging / Pruebas oficiales DGT
       this.idpUrl = 'https://idp.comprobanteselectronicos.go.cr/auth/realms/rut-stag/protocol/openid-connect/token';
       this.apiUrl = 'https://api.comprobanteselectronicos.go.cr/recepcion-sandbox/v1';
     }
@@ -89,6 +95,10 @@ export class HaciendaClient {
    * Hacienda responde HTTP 202 Accepted de forma inmediata.
    */
   async enviarComprobante(payload: RecepcionPayload): Promise<{ status: number; location?: string }> {
+    if (this.apiUrl.includes('/recepcion/v1') && (process.env.NODE_ENV !== 'production' || process.env.ALLOW_HACIENDA_PROD !== 'true')) {
+      throw new Error('[SALVAGUARDA ANTI-PRODUCCIÓN] Transmisión abortada: Se detectó llamada a endpoint de producción fuera de entorno productivo.');
+    }
+
     const token = await this.obtenerToken();
 
     try {
