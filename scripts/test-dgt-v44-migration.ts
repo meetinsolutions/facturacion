@@ -253,12 +253,15 @@ async function runDgtV44Tests() {
 
     assert(xmlFirmado.includes('https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.4/facturaElectronica'), 'XML firmado debe preservar namespace v4.4');
     assert(xmlFirmado.includes('<ds:Signature'), 'Debe contener nodo ds:Signature');
-    assert(xmlFirmado.includes('xades:SignedProperties'), 'Debe contener propiedades XAdES-BES');
+    assert(xmlFirmado.includes('xades:SignedProperties'), 'Debe contener propiedades XAdES-EPES');
+    assert(xmlFirmado.includes('xades:SignaturePolicyIdentifier'), 'Debe contener SignaturePolicyIdentifier');
 
     const firmaValida = verificarFirmaXML(xmlFirmado);
-    assert(firmaValida, 'La firma criptográfica XAdES-BES sobre el XML v4.4 debe ser válida');
+    assert(firmaValida.valida, 'La firma criptográfica XAdES-EPES sobre el XML v4.4 debe ser válida');
+    assert(firmaValida.policyIdValido, 'La política de firma debe ser válida y apuntar a v4.4');
+    assert(firmaValida.policyDigestValido, 'El digest de la política debe coincidir con el oficial v4.4');
 
-    record(7, 'Firmado Digital XAdES-BES en XML v4.4', true, 'Firma RSA-SHA256 validada matemáticamente sobre comprobante v4.4.');
+    record(7, 'Firmado Digital XAdES-EPES en XML v4.4', true, 'Firma RSA-SHA256 y Policy Id v4.4 validados matemáticamente sobre comprobante v4.4.');
   } catch (err: any) {
     record(7, 'Firmado Digital XAdES-BES en XML v4.4', false, err.message);
     throw err;

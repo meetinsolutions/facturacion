@@ -50,7 +50,7 @@ export class HaciendaClient {
     } else {
       // Staging / Pruebas oficiales DGT
       this.idpUrl = 'https://idp.comprobanteselectronicos.go.cr/auth/realms/rut-stag/protocol/openid-connect/token';
-      this.apiUrl = 'https://api.comprobanteselectronicos.go.cr/recepcion-sandbox/v1';
+      this.apiUrl = 'https://api-sandbox.comprobanteselectronicos.go.cr/recepcion/v1';
     }
   }
 

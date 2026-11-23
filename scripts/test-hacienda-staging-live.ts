@@ -15,7 +15,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import 'dotenv/config';
 import axios from 'axios';
-import { generarXMLFactura } from '../src/services/xml-builder.js';
+import { generarXMLFactura, formatoFechaCR } from '../src/services/xml-builder.js';
 import { firmarXMLFactura, verificarFirmaXML, cargarCertificadoP12, CertificadoInfo } from '../src/services/xml-signer.js';
 import { generarCertificadoPruebaP12 } from '../src/services/cert-generator.js';
 import { ComprobanteElectronico } from '../src/types/factura.types.js';
@@ -23,7 +23,7 @@ import { ComprobanteElectronico } from '../src/types/factura.types.js';
 // Configuración de Endpoints Oficiales de Hacienda Staging
 const STAGING_CONFIG = {
   idpUrl: 'https://idp.comprobanteselectronicos.go.cr/auth/realms/rut-stag/protocol/openid-connect/token',
-  apiUrl: 'https://api.comprobanteselectronicos.go.cr/recepcion-sandbox/v1',
+  apiUrl: 'https://api-sandbox.comprobanteselectronicos.go.cr/recepcion/v1',
   clientId: 'api-stag'
 };
 
@@ -291,7 +291,7 @@ async function main() {
   console.log('\n--- PASO 2: ENVÍO DEL COMPROBANTE AL ENDPOINT DE RECEPCIÓN ---');
   const payloadEnvio = {
     clave,
-    fecha: new Date().toISOString(),
+    fecha: formatoFechaCR(docFactura.fechaEmision),
     emisor: {
       tipoIdentificacion: emisorTipoId,
       numeroIdentificacion: emisorCedula

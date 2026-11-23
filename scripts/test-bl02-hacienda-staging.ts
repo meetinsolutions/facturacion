@@ -227,6 +227,8 @@ async function runBL02Validation() {
       assert(v.docDigestValido, `DocDigest inválido en ${gf.nombre}`);
       assert(v.keyInfoDigestValido, `KeyInfoDigest inválido en ${gf.nombre}`);
       assert(v.signedPropsDigestValido, `SignedPropsDigest inválido en ${gf.nombre}`);
+      assert(v.policyIdValido, `PolicyId inválido en ${gf.nombre}`);
+      assert(v.policyDigestValido, `PolicyDigest inválido en ${gf.nombre}`);
       assert(v.firmaCriptograficaValida, `Firma RSA-SHA256 no verificó para ${gf.nombre}`);
     }
 
@@ -236,9 +238,9 @@ async function runBL02Validation() {
     const vAlterado = verificarFirmaXML(alterado);
     assert(!vAlterado.valida && !vAlterado.docDigestValido, 'Alteración no detectada');
 
-    record(2, 'Perfil de Firma XAdES-BES e Integridad', true, 'RSA-SHA256, C14N, digests de documento y propiedades firmadas validados al 100%. Tamper-proofing efectivo.');
+    record(2, 'Perfil de Firma XAdES-EPES (Policy Id v4.4) e Integridad', true, 'RSA-SHA256, C14N, SignaturePolicyIdentifier v4.4, digests de documento y propiedades firmadas validados al 100%.');
   } catch (err: any) {
-    record(2, 'Perfil de Firma XAdES-BES e Integridad', false, err.message);
+    record(2, 'Perfil de Firma XAdES-EPES (Policy Id v4.4) e Integridad', false, err.message);
     throw err;
   }
 
@@ -301,7 +303,7 @@ async function runBL02Validation() {
 
     // Validar URLs internas configuradas
     const idpExpected = 'https://idp.comprobanteselectronicos.go.cr/auth/realms/rut-stag/protocol/openid-connect/token';
-    const apiExpected = 'https://api.comprobanteselectronicos.go.cr/recepcion-sandbox/v1';
+    const apiExpected = 'https://api-sandbox.comprobanteselectronicos.go.cr/recepcion/v1';
 
     assert.strictEqual((client as any).idpUrl, idpExpected, 'URL de IdP Staging debe coincidir con la oficial');
     assert.strictEqual((client as any).apiUrl, apiExpected, 'URL de API Sandbox Staging debe coincidir con la oficial');
