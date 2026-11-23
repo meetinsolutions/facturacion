@@ -44,10 +44,14 @@ export function signAuthToken(ctx: AuthContext): string {
 }
 
 export function setAuthCookie(res: Response, token: string): void {
+  const isSecure =
+    process.env.NODE_ENV === 'production' ||
+    Boolean(process.env.APP_URL?.startsWith('https://')) ||
+    Boolean(process.env.PUBLIC_APP_URL?.startsWith('https://'));
   res.cookie(AUTH_COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: isSecure,
     maxAge: 7 * 24 * 60 * 60 * 1000,
     path: '/'
   });

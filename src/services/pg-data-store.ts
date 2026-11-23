@@ -205,6 +205,28 @@ export class PgDataStore {
     };
   }
 
+  /**
+   * Retorna la configuración sanitizada para el frontend/API, omitiendo contraseñas y PINs en texto claro
+   */
+  async getConfigPublic(tenantId: string): Promise<ConfigSistemaConCert> {
+    const full = await this.getConfig(tenantId);
+    return {
+      ...full,
+      hacienda: {
+        ...full.hacienda,
+        password: '',
+        pin: '',
+        tienePassword: Boolean(full.hacienda?.password),
+        tienePin: Boolean(full.hacienda?.pin)
+      } as any,
+      correo: {
+        ...full.correo,
+        password: '',
+        tienePassword: Boolean(full.correo?.password)
+      } as any
+    };
+  }
+
   async saveConfig(tenantId: string, data: Partial<ConfiguracionSistema>): Promise<ConfigSistemaConCert> {
     const actual = await this.getConfig(tenantId);
     const updatedEmisor = { ...actual.emisor, ...(data.emisor || {}) };
@@ -214,8 +236,22 @@ export class PgDataStore {
       ConfiguracionSistema['correo']
     >;
 
-    const { password: hPass, pin: hPin, ...haciendaPublic } = updatedHaciendaFull;
-    const { password: cPass, ...correoPublic } = updatedCorreoFull;
+    // Preservar contraseñas cifradas actuales si el payload no las incluye o envía valores vacíos/enmascarados
+    let hPass = actual.hacienda?.password || '';
+    if (data.hacienda?.password && !data.hacienda.password.includes('•••') && data.hacienda.password.trim() !== '') {
+      hPass = data.hacienda.password;
+    }
+    let hPin = actual.hacienda?.pin || '';
+    if (data.hacienda?.pin && !data.hacienda.pin.includes('•••') && data.hacienda.pin.trim() !== '') {
+      hPin = data.hacienda.pin;
+    }
+    let cPass = actual.correo?.password || '';
+    if (data.correo?.password && !data.correo.password.includes('•••') && data.correo.password.trim() !== '') {
+      cPass = data.correo.password;
+    }
+
+    const { password: _hp, pin: _hpn, ...haciendaPublic } = updatedHaciendaFull;
+    const { password: _cp, ...correoPublic } = updatedCorreoFull;
 
     await pool.query(
       `INSERT INTO tenant_configs (tenant_id, emisor_json, sitio_json, hacienda_json, hacienda_password_enc, hacienda_pin_enc, correo_json, correo_password_enc, updated_at)

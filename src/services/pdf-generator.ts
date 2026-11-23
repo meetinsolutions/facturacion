@@ -139,7 +139,9 @@ export async function obtenerOgenerarFacturaPDF(
   clave: string,
   htmlGenerator: () => Promise<string>
 ): Promise<Buffer> {
-  const cacheKey = `${tenantId}_${clave}`;
+  const safeTenant = String(tenantId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  const safeClave = String(clave || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  const cacheKey = `${safeTenant}_${safeClave}`;
   const cacheDir = obtenerDirectorioCache();
   const cacheFilePath = path.join(cacheDir, `${cacheKey}.pdf`);
 

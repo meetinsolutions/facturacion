@@ -99,7 +99,83 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '127.0.0.1';
 
-app.use(cors({ origin: true, credentials: true }));
+// Orígenes autorizados para peticiones cross-origin con credenciales
+const ALLOWED_CORS_ORIGINS = [
+  process.env.PUBLIC_APP_URL,
+  process.env.APP_URL,
+  'https://test-facturacion.meetinlabs.com',
+  'https://facturacion.meetinlabs.com',
+  'http://localhost:3000',
+  'http://localhost:3050',
+  'http://localhost:3055',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:3050',
+  'http://127.0.0.1:3055'
+].filter(Boolean).map(o => (o as string).replace(/\/+$/, ''));
+
+// Configuración CORS segura (prevención estricta de reflejo de orígenes arbitrarios con credenciales)
+app.use(cors({
+  origin: (requestOrigin, callback) => {
+    // Permitir solicitudes directas o del mismo origen (ej: curl, scripts locales, peticiones sin header Origin)
+    if (!requestOrigin) return callback(null, true);
+    const clean = requestOrigin.replace(/\/+$/, '');
+    if (ALLOWED_CORS_ORIGINS.includes(clean)) {
+      return callback(null, true);
+    }
+    // Denegar explícitamente cualquier origen no registrado
+    return callback(null, false);
+  },
+  credentials: true
+}));
+
+// Encabezados globales de seguridad HTTP
+app.use((req: Request, res: Response, next: NextFunction) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
+
+// Protección Anti-CSRF para solicitudes con mutación de estado
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+    // Excluir webhooks públicos de pago y portal público OTP / comprobantes
+    if (
+      req.path.startsWith('/api/billing/webhook/') ||
+      req.path.startsWith('/api/public/') ||
+      req.path.startsWith('/c/')
+    ) {
+      return next();
+    }
+
+    const origin = (req.headers['origin'] || req.headers['referer']) as string | undefined;
+    if (origin) {
+      try {
+        const originUrl = new URL(origin);
+        const originClean = `${originUrl.protocol}//${originUrl.host}`;
+        const reqHost = req.headers['host'];
+
+        const isSameHost = reqHost && originUrl.host === reqHost;
+        const isAllowedOrigin = ALLOWED_CORS_ORIGINS.includes(originClean);
+
+        if (!isSameHost && !isAllowedOrigin) {
+          return res.status(403).json({
+            success: false,
+            error: 'Solicitud bloqueada por protección de origen cruzado (Anti-CSRF).'
+          });
+        }
+      } catch {
+        return res.status(403).json({ success: false, error: 'Encabezado de origen inválido.' });
+      }
+    }
+  }
+  next();
+});
+
 // Permitir payloads Base64 para logos y certificados de hasta 15MB, guardando rawBody para firmas de webhooks
 app.use(express.json({
   limit: '15mb',
@@ -1234,13 +1310,14 @@ app.post('/api/superadmin/gateways', requireSuperAdmin, ah(async (req, res) => {
 // ==========================================
 
 app.get('/api/configuracion', ah(async (req, res) => {
-  const config = await pgDataStore.getConfig(tid(req));
+  const config = await pgDataStore.getConfigPublic(tid(req));
   res.json({ success: true, data: config });
 }));
 
 app.post('/api/configuracion', requireAdmin, ah(async (req, res) => {
-  const updated = await pgDataStore.saveConfig(tid(req), req.body || {});
-  res.json({ success: true, data: updated });
+  await pgDataStore.saveConfig(tid(req), req.body || {});
+  const sanitized = await pgDataStore.getConfigPublic(tid(req));
+  res.json({ success: true, data: sanitized });
 }));
 
 app.post('/api/configuracion/certificado', requireAdmin, ah(async (req, res) => {
