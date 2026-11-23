@@ -434,23 +434,6 @@ export function renderPortalClienteAppHTML(esQA: boolean = true): string {
         }
       },
 
-          if (res.status === 401) {
-            this.cerrarSesion();
-            return;
-          }
-
-          const data = await res.json();
-          if (!data.ok) throw new Error(data.error);
-
-          this.renderizarListado(data.comprobantes || []);
-          this.renderizarEstadisticas(data.comprobantes || [], data.total || 0);
-          this.renderizarPaginador(data.total || 0, data.pagina || 1, data.totalPaginas || 1);
-        } catch (err) {
-          tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-rose-400">Error al cargar comprobantes.</td></tr>';
-          cards.innerHTML = '<div class="p-6 text-center text-rose-400 text-xs">Error al cargar comprobantes.</div>';
-        }
-      },
-
       renderizarListado(items) {
         const tbody = document.getElementById('comprobantesTableBody');
         const cards = document.getElementById('comprobantesCardsContainer');

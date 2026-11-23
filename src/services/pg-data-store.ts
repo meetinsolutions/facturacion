@@ -757,6 +757,17 @@ export class PgDataStore {
 
     const tieneXml = Boolean(xmlContent);
     const tienePdf = Boolean(pdfBuffer && pdfBuffer.length > 0);
+    const consecutivo = gasto.consecutivo || (gasto.clave && gasto.clave.length === 50 ? gasto.clave.substring(21, 41) : '00100001010000000001');
+    const tipoDocNombres: Record<string, string> = {
+      '01': 'Factura Electrónica',
+      '02': 'Nota de Débito',
+      '03': 'Nota de Crédito',
+      '04': 'Tiquete Electrónico',
+      '08': 'Factura Electrónica de Compra',
+      '09': 'Factura Electrónica de Exportación'
+    };
+    const tipoDocumentoNombre = gasto.tipoDocumentoNombre || tipoDocNombres[gasto.tipoDocumento] || `Comprobante ${gasto.tipoDocumento}`;
+
     await pool.query(
       `INSERT INTO gastos (
         tenant_id, clave, consecutivo, tipo_documento, tipo_documento_nombre, fecha_emision,
@@ -772,9 +783,9 @@ export class PgDataStore {
       [
         tenantId,
         gasto.clave,
-        gasto.consecutivo,
+        consecutivo,
         gasto.tipoDocumento,
-        gasto.tipoDocumentoNombre,
+        tipoDocumentoNombre,
         new Date(gasto.fechaEmision),
         gasto.emisorNombre,
         gasto.emisorNombreComercial || null,

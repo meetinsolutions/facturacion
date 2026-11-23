@@ -18,7 +18,69 @@ function escapeHtml(str: any): string {
 
 function formatoMoneda(monto: number, moneda: string): string {
   const sim = moneda === 'USD' ? '$' : '₡';
-  return `${sim}${Number(monto || 0).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `${sim} ${Number(monto || 0).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function parseXmlFallback(xmlStr: string) {
+  if (!xmlStr || typeof xmlStr !== 'string') return null;
+  const lineas: any[] = [];
+  const lineaMatches = xmlStr.match(/<LineaDetalle>[\s\S]*?<\/LineaDetalle>/g) || [];
+  for (let i = 0; i < lineaMatches.length; i++) {
+    const lXml = lineaMatches[i];
+    const detalle = lXml.match(/<Detalle>([^<]+)<\/Detalle>/)?.[1] || '';
+    const codigoCabys = lXml.match(/<Codigo>([^<]+)<\/Codigo>/)?.[1] || '';
+    const cantidad = Number(lXml.match(/<Cantidad>([^<]+)<\/Cantidad>/)?.[1] || 1);
+    const unidadMedida = lXml.match(/<UnidadMedida>([^<]+)<\/UnidadMedida>/)?.[1] || 'Unid';
+    const precioUnitario = Number(lXml.match(/<PrecioUnitario>([^<]+)<\/PrecioUnitario>/)?.[1] || 0);
+    const tarifaIVA = Number(lXml.match(/<Tarifa>([^<]+)<\/Tarifa>/)?.[1] || 13);
+    const montoTotalLinea = Number(lXml.match(/<MontoTotalLinea>([^<]+)<\/MontoTotalLinea>/)?.[1] || (cantidad * precioUnitario));
+    lineas.push({
+      numeroLinea: i + 1,
+      detalle,
+      codigoCabys,
+      cantidad,
+      unidadMedida,
+      precioUnitario,
+      tarifaIVA,
+      montoTotalLinea
+    });
+  }
+
+  const emisorMatch = xmlStr.match(/<Emisor>([\s\S]*?)<\/Emisor>/);
+  const emisorNombre = emisorMatch?.[1].match(/<Nombre>([^<]+)<\/Nombre>/)?.[1] || '';
+  const emisorNombreComercial = emisorMatch?.[1].match(/<NombreComercial>([^<]+)<\/NombreComercial>/)?.[1] || '';
+  const emisorCedula = emisorMatch?.[1].match(/<Numero>([^<]+)<\/Numero>/)?.[1] || '';
+  const emisorCorreo = emisorMatch?.[1].match(/<CorreoElectronico>([^<]+)<\/CorreoElectronico>/)?.[1] || '';
+
+  const receptorMatch = xmlStr.match(/<Receptor>([\s\S]*?)<\/Receptor>/);
+  const receptorNombre = receptorMatch?.[1].match(/<Nombre>([^<]+)<\/Nombre>/)?.[1] || '';
+  const receptorCedula = receptorMatch?.[1].match(/<Numero>([^<]+)<\/Numero>/)?.[1] || '';
+  const receptorCorreo = receptorMatch?.[1].match(/<CorreoElectronico>([^<]+)<\/CorreoElectronico>/)?.[1] || '';
+
+  const resumenMatch = xmlStr.match(/<ResumenFactura>([\s\S]*?)<\/ResumenFactura>/);
+  const totalServGravados = Number(resumenMatch?.[1].match(/<TotalServGravados>([^<]+)<\/TotalServGravados>/)?.[1] || 0);
+  const totalMercanciasGravadas = Number(resumenMatch?.[1].match(/<TotalMercanciasGravadas>([^<]+)<\/TotalMercanciasGravadas>/)?.[1] || 0);
+  const totalImpuesto = Number(resumenMatch?.[1].match(/<TotalImpuesto>([^<]+)<\/TotalImpuesto>/)?.[1] || 0);
+
+  return {
+    lineas,
+    emisor: {
+      nombre: emisorNombre,
+      nombreComercial: emisorNombreComercial,
+      identificacion: { numero: emisorCedula },
+      correo: emisorCorreo
+    },
+    receptor: {
+      nombre: receptorNombre,
+      identificacion: { numero: receptorCedula },
+      correo: receptorCorreo
+    },
+    resumen: {
+      totalServiciosGravados: totalServGravados,
+      totalMercanciasGravadas,
+      totalImpuesto
+    }
+  };
 }
 
 export async function generarPortalComprobanteHTML(
@@ -26,10 +88,29 @@ export async function generarPortalComprobanteHTML(
   rawToken: string
 ): Promise<string> {
   const doc = comp.docOriginalJson || {};
-  const emisor = comp.emisorJson?.emisor || doc.emisor || {};
-  const receptor = doc.receptor || {};
-  const lineas = Array.isArray(doc.lineas) ? doc.lineas : [];
-  const resumen = doc.resumen || {};
+  const xmlFallback: any = parseXmlFallback(comp.xmlFirmado || '') || { lineas: [], emisor: {}, receptor: {}, resumen: {} };
+
+  const rawEmisor: any = comp.emisorJson?.emisor || (comp.emisorJson?.nombre ? comp.emisorJson : doc.emisor) || {};
+  const emisor = {
+    nombre: rawEmisor.nombre || doc.emisor?.nombre || xmlFallback.emisor?.nombre || 'Emisor',
+    nombreComercial: rawEmisor.nombreComercial || doc.emisor?.nombreComercial || xmlFallback.emisor?.nombreComercial || '',
+    identificacion: {
+      numero: rawEmisor.cedula || rawEmisor.identificacion?.numero || doc.emisor?.identificacion?.numero || xmlFallback.emisor?.identificacion?.numero || 'N/A'
+    },
+    correo: rawEmisor.correo || doc.emisor?.correo || xmlFallback.emisor?.correo || ''
+  };
+
+  const rawReceptor: any = doc.receptor || {};
+  const receptor = {
+    nombre: rawReceptor.nombre || comp.cliente || xmlFallback.receptor?.nombre || 'Cliente',
+    identificacion: {
+      numero: rawReceptor.identificacion?.numero || rawReceptor.cedula || xmlFallback.receptor?.identificacion?.numero || ''
+    },
+    correo: rawReceptor.correo || xmlFallback.receptor?.correo || ''
+  };
+
+  const lineas = (Array.isArray(doc.lineas) && doc.lineas.length > 0) ? doc.lineas : xmlFallback.lineas;
+  const resumen = doc.resumen || xmlFallback.resumen || {};
 
   const isTest = process.env.NODE_ENV !== 'production' || 
                  (process.env.APP_URL || '').includes('test-') || 
@@ -313,7 +394,7 @@ export async function generarPortalComprobanteHTML(
         </div>
 
         <div class="totals-box">
-          <div class="tot-row"><span>Total Servicios Gravados:</span> <span>${formatoMoneda(resumen.totalServGravados || 0, comp.moneda)}</span></div>
+          <div class="tot-row"><span>Total Servicios Gravados:</span> <span>${formatoMoneda(resumen.totalServiciosGravados || resumen.totalServGravados || 0, comp.moneda)}</span></div>
           <div class="tot-row"><span>Total Mercancías Gravadas:</span> <span>${formatoMoneda(resumen.totalMercanciasGravadas || 0, comp.moneda)}</span></div>
           <div class="tot-row"><span>Total Impuesto (IVA):</span> <span>${formatoMoneda(resumen.totalImpuesto || 0, comp.moneda)}</span></div>
           <div class="tot-row tot-grand"><span>Total a Pagar:</span> <span>${formatoMoneda(comp.total, comp.moneda)}</span></div>
