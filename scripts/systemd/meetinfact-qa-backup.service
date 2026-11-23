@@ -1,0 +1,11 @@
+[Unit]
+Description=MeetinFact QA - Respaldo Cifrado Diario PostgreSQL (facturacion_test)
+After=network.target docker.service
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/opt/facturacion-test/scripts/backup-qa-db.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=meetinfact-qa-backup

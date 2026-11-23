@@ -1,0 +1,11 @@
+# ==============================================================================
+# CONFIGURACIÓN DE ALERTAS OPERATIVAS — MEETINFACT QA
+# Ubicación en servidor: /etc/meetinfact-qa/alerts.conf (chmod 0600)
+# ==============================================================================
+
+# Webhook URL para notificaciones push (Slack Incoming Webhook, Discord o PagerDuty)
+# Pendiente de configuración por el propietario
+ALERT_WEBHOOK_URL=""
+
+# Correo de destino para reportes críticos (opcional)
+ALERT_EMAIL=""

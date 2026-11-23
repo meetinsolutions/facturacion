@@ -1,0 +1,11 @@
+[Unit]
+Description=MeetinFact QA - Chequeo de Salud y Alertas Operativas
+After=network.target
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/opt/facturacion-test/scripts/monitor-health-alerts.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=meetinfact-qa-monitor

@@ -1,0 +1,11 @@
+[Unit]
+Description=MeetinFact QA - Timer Periódico de Monitoreo (Cada 15 min)
+After=network.target
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

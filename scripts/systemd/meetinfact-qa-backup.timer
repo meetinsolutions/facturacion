@@ -1,0 +1,10 @@
+[Unit]
+Description=MeetinFact QA - Timer Diario de Respaldo Cifrado
+After=network.target
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target
