@@ -770,6 +770,11 @@ app.post('/api/billing/webhook/:provider', ah(async (req, res) => {
     res.json({ success: true, ...result });
   } catch (err: any) {
     console.error(`[WEBHOOK ${provider}] Error procesando webhook:`, err.message);
+    const isTransient = /connection|timeout|deadlock|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|57P01|57P02|57P03|40P01|08006|08001/i.test(err.message || err.code || '');
+    if (isTransient) {
+      res.setHeader('Retry-After', '30');
+      return res.status(503).json({ success: false, transient: true, error: err.message });
+    }
     res.status(400).json({ success: false, error: err.message });
   }
 }));

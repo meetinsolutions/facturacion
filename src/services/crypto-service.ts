@@ -1,8 +1,23 @@
 import * as crypto from 'crypto';
 
-function getEncryptionKey(): Buffer {
+function getDerivedKey(secret: string): Buffer {
+  return crypto.createHash('sha256').update(secret, 'utf8').digest();
+}
+
+function getPrimaryEncryptionKey(): Buffer {
   const raw = process.env.APP_ENCRYPTION_KEY || process.env.JWT_SECRET || 'facturacion-dev-key-change-me';
-  return crypto.createHash('sha256').update(raw, 'utf8').digest();
+  return getDerivedKey(raw);
+}
+
+function getFallbackEncryptionKey(): Buffer | null {
+  if (
+    process.env.APP_ENCRYPTION_KEY &&
+    process.env.JWT_SECRET &&
+    process.env.APP_ENCRYPTION_KEY !== process.env.JWT_SECRET
+  ) {
+    return getDerivedKey(process.env.JWT_SECRET);
+  }
+  return null;
 }
 
 export function hashPassword(plain: string): string {
@@ -31,10 +46,19 @@ export function encryptSecret(plain?: string | null): string {
   const text = plain === null || plain === undefined ? '' : String(plain);
   if (!text) return '';
   const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', getEncryptionKey(), iv);
+  const cipher = crypto.createCipheriv('aes-256-gcm', getPrimaryEncryptionKey(), iv);
   const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
   const tag = cipher.getAuthTag();
   return `encv1$${iv.toString('hex')}$${tag.toString('hex')}$${encrypted.toString('hex')}`;
+}
+
+function decryptWithKey(ivHex: string, tagHex: string, encHex: string, key: Buffer): Buffer {
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'));
+  decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
+  return Buffer.concat([
+    decipher.update(Buffer.from(encHex, 'hex')),
+    decipher.final()
+  ]);
 }
 
 export function decryptSecret(payload?: string | null): string {
@@ -43,18 +67,27 @@ export function decryptSecret(payload?: string | null): string {
   const parts = payload.split('$');
   if (parts.length !== 4) return '';
   const [, ivHex, tagHex, encHex] = parts;
-  const decipher = crypto.createDecipheriv('aes-256-gcm', getEncryptionKey(), Buffer.from(ivHex, 'hex'));
-  decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
-  const decrypted = Buffer.concat([
-    decipher.update(Buffer.from(encHex, 'hex')),
-    decipher.final()
-  ]);
-  return decrypted.toString('utf8');
+
+  try {
+    const decrypted = decryptWithKey(ivHex, tagHex, encHex, getPrimaryEncryptionKey());
+    return decrypted.toString('utf8');
+  } catch (errPrimary) {
+    const fallbackKey = getFallbackEncryptionKey();
+    if (fallbackKey) {
+      try {
+        const decryptedFallback = decryptWithKey(ivHex, tagHex, encHex, fallbackKey);
+        return decryptedFallback.toString('utf8');
+      } catch {
+        // Fallback también falló
+      }
+    }
+    return '';
+  }
 }
 
 export function encryptBuffer(buf: Buffer): string {
   const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', getEncryptionKey(), iv);
+  const cipher = crypto.createCipheriv('aes-256-gcm', getPrimaryEncryptionKey(), iv);
   const encrypted = Buffer.concat([cipher.update(buf), cipher.final()]);
   const tag = cipher.getAuthTag();
   return `bufv1$${iv.toString('hex')}$${tag.toString('hex')}$${encrypted.toString('hex')}`;
@@ -65,10 +98,18 @@ export function decryptBuffer(payload?: string | null): Buffer | null {
   const parts = payload.split('$');
   if (parts.length !== 4) return null;
   const [, ivHex, tagHex, encHex] = parts;
-  const decipher = crypto.createDecipheriv('aes-256-gcm', getEncryptionKey(), Buffer.from(ivHex, 'hex'));
-  decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
-  return Buffer.concat([
-    decipher.update(Buffer.from(encHex, 'hex')),
-    decipher.final()
-  ]);
+
+  try {
+    return decryptWithKey(ivHex, tagHex, encHex, getPrimaryEncryptionKey());
+  } catch (errPrimary) {
+    const fallbackKey = getFallbackEncryptionKey();
+    if (fallbackKey) {
+      try {
+        return decryptWithKey(ivHex, tagHex, encHex, fallbackKey);
+      } catch {
+        // Fallback también falló
+      }
+    }
+    return null;
+  }
 }

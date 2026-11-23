@@ -842,7 +842,7 @@ export async function confirmarPagoOnvo(
     const paymentStatusNorm = (eventData.paymentStatus || '').toLowerCase();
 
     let isFundCollected = false;
-    if (eventData.eventType.includes('payment') && (statusNorm === 'succeeded' || statusNorm === 'paid')) {
+    if ((eventData.eventType.includes('payment') || eventData.eventType.includes('subscription')) && (statusNorm === 'succeeded' || statusNorm === 'paid')) {
       isFundCollected = true;
     } else if (eventData.eventType.includes('checkout')) {
       if (paymentStatusNorm === 'paid') {
@@ -1074,14 +1074,27 @@ export async function procesarWebhook(provider: string, body: any) {
         const pIntentId = obj.paymentIntent || obj.payment_intent || obj.id;
         const txId = metadata.transactionId || (pIntentId ? (await pool.query('SELECT id FROM payment_transactions WHERE payment_intent_id = $1 LIMIT 1', [pIntentId])).rows[0]?.id : undefined);
         if (txId) {
+          const txRes = await pool.query('SELECT amount_crc, amount_usd FROM payment_transactions WHERE id = $1', [txId]);
+          const totalCrc = Number(txRes.rows[0]?.amount_crc || txRes.rows[0]?.amount_usd || 0);
+          const refundAmountCents = Number(obj.amount ?? obj.amountRefunded ?? obj.amount_refunded ?? 0);
+          const refundAmountCrc = refundAmountCents > 0 ? refundAmountCents / 100 : totalCrc;
+          const isPartial = refundAmountCrc > 0 && refundAmountCrc < totalCrc;
+          const newStatus = isPartial ? 'partially_refunded' : 'refunded';
+
           await pool.query(
-            `UPDATE payment_transactions SET status = 'refunded', comprobante_notas = CASE 
-               WHEN comprobante_notas IS NULL OR comprobante_notas = '' THEN $2 
-               ELSE comprobante_notas || ' | ' || $2 
+            `UPDATE payment_transactions SET status = $2, comprobante_notas = CASE 
+               WHEN comprobante_notas IS NULL OR comprobante_notas = '' THEN $3 
+               ELSE comprobante_notas || ' | ' || $3 
              END WHERE id = $1`,
-            [txId, `[REEMBOLSO ONVO] Evento ${rawType} registrado el ${new Date().toISOString()}`]
+            [
+              txId,
+              newStatus,
+              isPartial
+                ? `[REEMBOLSO ONVO - PARCIAL] ₡${refundAmountCrc.toLocaleString('es-CR')} de ₡${totalCrc.toLocaleString('es-CR')} (${new Date().toISOString()})`
+                : `[REEMBOLSO ONVO] Evento ${rawType} registrado el ${new Date().toISOString()}`
+            ]
           );
-          return { received: true, refunded: true, transactionId: txId };
+          return { received: true, refunded: true, partial: isPartial, transactionId: txId };
         }
       }
       return { received: true, ignored: true, reason: `Evento no accionable: ${rawType}` };
@@ -1134,23 +1147,35 @@ export async function procesarWebhook(provider: string, body: any) {
     // Diferenciación de cobros recurrentes reales:
     // Si ONVO debita un ciclo recurrente en tarjeta para un tenant registrado,
     // se genera una transacción de renovación automática vinculada a su suscripción.
+    // Prevenir duplicación si llegan eventos casi simultáneos con el mismo paymentIntentId o sessionId.
     if (!transactionId && metadata.tenantId && (paymentIntentId || sessionId)) {
-      const subRes = await pool.query('SELECT * FROM subscriptions WHERE tenant_id = $1', [metadata.tenantId]);
-      if (subRes.rowCount) {
-        const sub = subRes.rows[0];
-        const planCode = metadata.planCode || sub.plan_code;
-        const cycle = (metadata.billingCycle || sub.billing_cycle || 'monthly') as 'monthly' | 'yearly';
-        const planRes = await pool.query('SELECT * FROM plans WHERE code = $1', [planCode]);
-        const plan = planRes.rows[0];
-        const amountCrc = cycle === 'yearly' ? Number(plan?.precio_anual_crc || 0) : Number(plan?.precio_mensual_crc || 0);
+      const existingTx = await pool.query(
+        `SELECT id FROM payment_transactions
+         WHERE (payment_intent_id = $1 AND $1 IS NOT NULL)
+            OR (checkout_session_id = $2 AND $2 IS NOT NULL)
+         LIMIT 1`,
+        [paymentIntentId || null, sessionId || null]
+      );
+      if (existingTx.rowCount) {
+        transactionId = existingTx.rows[0].id;
+      } else {
+        const subRes = await pool.query('SELECT * FROM subscriptions WHERE tenant_id = $1', [metadata.tenantId]);
+        if (subRes.rowCount) {
+          const sub = subRes.rows[0];
+          const planCode = metadata.planCode || sub.plan_code;
+          const cycle = (metadata.billingCycle || sub.billing_cycle || 'monthly') as 'monthly' | 'yearly';
+          const planRes = await pool.query('SELECT * FROM plans WHERE code = $1', [planCode]);
+          const plan = planRes.rows[0];
+          const amountCrc = cycle === 'yearly' ? Number(plan?.precio_anual_crc || 0) : Number(plan?.precio_mensual_crc || 0);
 
-        const newTxId = crypto.randomUUID();
-        await pool.query(
-          `INSERT INTO payment_transactions (id, tenant_id, subscription_id, plan_code, billing_cycle, amount_usd, amount_crc, currency, provider, status, checkout_session_id, payment_intent_id, comprobante_notas)
-           VALUES ($1, $2, $3, $4, $5, $6, $6, 'CRC', 'onvopay', 'pending', $7, $8, $9)`,
-          [newTxId, metadata.tenantId, sub.id, planCode, cycle, amountCrc, sessionId || null, paymentIntentId || null, 'Renovación automática recurrente ONVO']
-        );
-        transactionId = newTxId;
+          const newTxId = crypto.randomUUID();
+          await pool.query(
+            `INSERT INTO payment_transactions (id, tenant_id, subscription_id, plan_code, billing_cycle, amount_usd, amount_crc, currency, provider, status, checkout_session_id, payment_intent_id, comprobante_notas)
+             VALUES ($1, $2, $3, $4, $5, $6, $6, 'CRC', 'onvopay', 'pending', $7, $8, $9)`,
+            [newTxId, metadata.tenantId, sub.id, planCode, cycle, amountCrc, sessionId || null, paymentIntentId || null, 'Renovación automática recurrente ONVO']
+          );
+          transactionId = newTxId;
+        }
       }
     }
 
