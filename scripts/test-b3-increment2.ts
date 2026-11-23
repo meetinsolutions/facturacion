@@ -61,9 +61,13 @@ async function runTestSuite() {
 
   const { verificarFirmaWebhook } = await import('../src/server');
 
-  // Limpieza inicial
+  // Limpieza inicial en orden hoja -> raíz para evitar contención de bloqueos FK
+  await controlPool.query('DELETE FROM auditoria_descargas_comprobantes');
+  await controlPool.query('DELETE FROM comprobantes_tokens_acceso');
+  await controlPool.query('DELETE FROM comprobantes');
   await controlPool.query('DELETE FROM payment_transactions');
   await controlPool.query('DELETE FROM subscriptions');
+  await controlPool.query('DELETE FROM users');
   await controlPool.query('DELETE FROM tenants');
 
   let passed = 0;
@@ -162,24 +166,30 @@ async function runTestSuite() {
     // ----------------------------------------------------
     await test('Checkout ONVO sin credenciales es rechazado explícitamente', async () => {
       const { tenantId } = await createTestTenant('onvo-nocred-2');
-      await saveGatewaysConfig({
-        pasarelaActiva: 'onvopay',
-        onvopay: { secretKey: '', publicKey: '', webhookSecret: '' },
-        stripe: { secretKey: '', publicKey: '', webhookSecret: '' },
-        tilopay: { apiUser: '', apiKey: '', key: '', apiPassword: '', webhookSecret: '' },
-        sinpeMovil: { telefono: '88888888', titular: 'Test' }
-      });
-
-      let threw = false;
+      const oldSecret = process.env.ONVO_SECRET_KEY;
+      delete process.env.ONVO_SECRET_KEY;
       try {
-        await iniciarCheckoutRecurrente(tenantId, 'pro', 'monthly', 'onvopay');
-      } catch (err: any) {
-        threw = true;
-        if (!err.message.includes('Onvo Pay no se encuentra configurada')) {
-          throw new Error(`Mensaje inesperado: ${err.message}`);
+        await saveGatewaysConfig({
+          pasarelaActiva: 'onvopay',
+          onvopay: { secretKey: '', publicKey: '', webhookSecret: '' },
+          stripe: { secretKey: '', publicKey: '', webhookSecret: '' },
+          tilopay: { apiUser: '', apiKey: '', key: '', apiPassword: '', webhookSecret: '' },
+          sinpeMovil: { telefono: '88888888', titular: 'Test' }
+        });
+
+        let threw = false;
+        try {
+          await iniciarCheckoutRecurrente(tenantId, 'pro', 'monthly', 'onvopay');
+        } catch (err: any) {
+          threw = true;
+          if (!err.message.includes('Onvo Pay no se encuentra configurada')) {
+            throw new Error(`Mensaje inesperado: ${err.message}`);
+          }
         }
+        if (!threw) throw new Error('Debería haber fallado por falta de credenciales');
+      } finally {
+        if (oldSecret) process.env.ONVO_SECRET_KEY = oldSecret;
       }
-      if (!threw) throw new Error('Debería haber fallado por falta de credenciales');
     });
 
     // ----------------------------------------------------
