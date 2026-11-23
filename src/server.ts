@@ -4,6 +4,16 @@ import {
   generarTokenAcceso,
   rotarTokenAcceso
 } from './services/comprobante-token-service.js';
+import {
+  solicitarOtpCliente,
+  verificarOtpCliente,
+  validarSesionCliente,
+  revocarSesionCliente,
+  listarComprobantesCliente,
+  obtenerComprobanteClienteAutorizado,
+  registrarAuditoriaCliente
+} from './services/portal-cliente-service.js';
+import { renderPortalClienteAppHTML } from './services/portal-cliente-renderer.js';
 import { generarPortalComprobanteHTML } from './services/portal-viewer-renderer.js';
 import { obtenerOgenerarFacturaPDF } from './services/pdf-generator.js';
 import {
@@ -657,6 +667,258 @@ function renderErrorComprobanteNoDisponible(res: Response): void {
 </body>
 </html>`);
 }
+
+function setPortalAppSecurityHeaders(res: Response): void {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data:; frame-src 'self'; frame-ancestors 'none';"
+  );
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+}
+
+function extraerTokenSesionCliente(req: Request): string {
+  const authHeader = req.headers['authorization'] || '';
+  if (authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7).trim();
+  }
+  if (req.cookies && req.cookies.portal_session) {
+    return String(req.cookies.portal_session).trim();
+  }
+  if (req.query && req.query.token) {
+    return String(req.query.token).trim();
+  }
+  return '';
+}
+
+async function exigirSesionCliente(req: Request, res: Response): Promise<{ id: string; email: string } | null> {
+  const token = extraerTokenSesionCliente(req);
+  if (!token) {
+    res.status(401).json({ ok: false, error: 'Sesión no provista o no autorizada.' });
+    return null;
+  }
+  const result = await validarSesionCliente(token);
+  if (!result.valid || !result.session) {
+    res.status(401).json({ ok: false, error: result.error || 'Sesión no válida o expirada.' });
+    return null;
+  }
+  return result.session;
+}
+
+// ==============================================================================
+// PORTAL DE CLIENTES (INCREMENTO 2) — INTERFAZ WEB Y AUTENTICACIÓN OTP
+// ==============================================================================
+
+// Aplicación web responsive del portal de clientes
+app.get(['/c/portal', '/c/historial'], (req, res) => {
+  setPortalAppSecurityHeaders(res);
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(renderPortalClienteAppHTML(true));
+});
+
+// Endpoint público para solicitud de código OTP
+app.post('/api/public/portal/auth/solicitar-otp', ah(async (req, res) => {
+  const email = String(req.body?.email || '');
+  const result = await solicitarOtpCliente(email, req.ip);
+  setPortalSecurityHeaders(res);
+  if (!result.ok) {
+    return res.status(400).json(result);
+  }
+  res.json(result);
+}));
+
+// Endpoint público para verificación de código OTP y apertura de sesión
+app.post('/api/public/portal/auth/verificar-otp', ah(async (req, res) => {
+  const email = String(req.body?.email || '');
+  const otp = String(req.body?.otp || '');
+  const result = await verificarOtpCliente(email, otp, {
+    ip: req.ip,
+    userAgent: req.headers['user-agent']
+  });
+
+  setPortalSecurityHeaders(res);
+  if (!result.ok) {
+    return res.status(400).json(result);
+  }
+
+  // Establecer cookie HttpOnly segura
+  res.cookie('portal_session', result.sessionToken, {
+    httpOnly: true,
+    sameSite: 'strict',
+    secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
+    maxAge: 2 * 3600 * 1000,
+    path: '/'
+  });
+
+  res.json({
+    ok: true,
+    sessionToken: result.sessionToken,
+    expiraEn: result.expiraEn,
+    mensaje: 'Autenticación exitosa.'
+  });
+}));
+
+// Cierre de sesión de cliente
+app.post('/api/public/portal/auth/logout', ah(async (req, res) => {
+  const token = extraerTokenSesionCliente(req);
+  if (token) {
+    await revocarSesionCliente(token);
+  }
+  res.clearCookie('portal_session', { path: '/' });
+  setPortalSecurityHeaders(res);
+  res.json({ ok: true, mensaje: 'Sesión finalizada exitosamente.' });
+}));
+
+// Consulta de historial de comprobantes autorizados para el cliente autenticado
+app.get('/api/public/portal/comprobantes', ah(async (req, res) => {
+  const session = await exigirSesionCliente(req, res);
+  if (!session) return;
+
+  const resultado = await listarComprobantesCliente(session.email, {
+    fechaDesde: req.query.fechaDesde ? String(req.query.fechaDesde) : undefined,
+    fechaHasta: req.query.fechaHasta ? String(req.query.fechaHasta) : undefined,
+    tipoDocumento: req.query.tipoDocumento ? String(req.query.tipoDocumento) : undefined,
+    estado: req.query.estado ? String(req.query.estado) : undefined,
+    tenantId: req.query.tenantId ? String(req.query.tenantId) : undefined,
+    limite: req.query.limite ? Number(req.query.limite) : 20,
+    offset: req.query.pagina ? (Math.max(Number(req.query.pagina), 1) - 1) * (Number(req.query.limite) || 20) : undefined
+  });
+
+  setPortalSecurityHeaders(res);
+  res.json({
+    ok: true,
+    email: session.email,
+    ...resultado
+  });
+}));
+
+// Consulta y visualización de un comprobante específico autorizado para el cliente
+app.get('/api/public/portal/comprobante/:clave', ah(async (req, res) => {
+  const session = await exigirSesionCliente(req, res);
+  if (!session) return;
+
+  const clave = String(req.params.clave || '').trim();
+  const data = await obtenerComprobanteClienteAutorizado(session.email, clave);
+  if (!data) {
+    setPortalSecurityHeaders(res);
+    return res.status(404).json({ ok: false, error: 'Comprobante no encontrado o no autorizado.' });
+  }
+
+  await registrarAuditoriaCliente(
+    data.comprobante.tenantId,
+    clave,
+    session.id,
+    session.email,
+    'portal_visualizacion',
+    req.ip,
+    req.headers['user-agent']
+  );
+
+  // Si la petición solicita HTML (iframe del modal o navegador directo)
+  if (req.headers.accept && req.headers.accept.includes('text/html')) {
+    setPortalSecurityHeaders(res);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    const compMock: any = {
+      ...data.comprobante,
+      tokenId: session.id,
+      expiraEn: new Date(Date.now() + 3600 * 1000),
+      revocado: false,
+      accesosContador: 1
+    };
+    const html = await generarPortalComprobanteHTML(compMock, 'session_auth');
+    return res.send(html);
+  }
+
+  setPortalSecurityHeaders(res);
+  res.json({
+    ok: true,
+    comprobante: {
+      clave: data.comprobante.clave,
+      consecutivo: data.comprobante.consecutivo,
+      tipoDocumento: data.comprobante.tipoDocumento,
+      fecha: data.comprobante.fecha,
+      moneda: data.comprobante.moneda,
+      total: data.comprobante.total,
+      cliente: data.comprobante.cliente,
+      estadoHacienda: data.comprobante.estadoHacienda,
+      emisorNombre: data.emisorNombre
+    }
+  });
+}));
+
+// Descarga autorizada de XML firmado original
+app.get('/api/public/portal/comprobante/:clave/xml', ah(async (req, res) => {
+  const session = await exigirSesionCliente(req, res);
+  if (!session) return;
+
+  const clave = String(req.params.clave || '').trim();
+  const data = await obtenerComprobanteClienteAutorizado(session.email, clave);
+  if (!data) {
+    setPortalSecurityHeaders(res);
+    return res.status(404).send('Comprobante no encontrado o no autorizado.');
+  }
+
+  await registrarAuditoriaCliente(
+    data.comprobante.tenantId,
+    clave,
+    session.id,
+    session.email,
+    'portal_descarga_xml',
+    req.ip,
+    req.headers['user-agent']
+  );
+
+  const xmlSha256 = crypto.createHash('sha256').update(data.comprobante.xmlFirmado).digest('hex');
+
+  setPortalSecurityHeaders(res);
+  res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${data.comprobante.clave}.xml"`);
+  res.setHeader('X-Content-SHA256', xmlSha256);
+  res.send(data.comprobante.xmlFirmado);
+}));
+
+// Descarga autorizada de PDF con motor de renderizado y caché protegida de Incremento 1
+app.get('/api/public/portal/comprobante/:clave/pdf', ah(async (req, res) => {
+  const session = await exigirSesionCliente(req, res);
+  if (!session) return;
+
+  const clave = String(req.params.clave || '').trim();
+  const data = await obtenerComprobanteClienteAutorizado(session.email, clave);
+  if (!data) {
+    setPortalSecurityHeaders(res);
+    return res.status(404).send('Comprobante no encontrado o no autorizado.');
+  }
+
+  await registrarAuditoriaCliente(
+    data.comprobante.tenantId,
+    clave,
+    session.id,
+    session.email,
+    'portal_descarga_pdf',
+    req.ip,
+    req.headers['user-agent']
+  );
+
+  const pdfBuffer = await obtenerOgenerarFacturaPDF(data.comprobante.tenantId, data.comprobante.clave, async () => {
+    return await generarFacturaEleganteHTML({
+      clave: data.comprobante.clave,
+      consecutivo: data.comprobante.consecutivo,
+      doc: data.comprobante.docOriginal,
+      config: (data.comprobante as any).emisorJson || { emisor: data.comprobante.docOriginal?.emisor },
+      estilo: (data.comprobante.docOriginal as any)?.estilo || 'ejecutivo'
+    });
+  });
+
+  setPortalSecurityHeaders(res);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${data.comprobante.clave}.pdf"`);
+  res.setHeader('Content-Length', String(pdfBuffer.length));
+  res.send(pdfBuffer);
+}));
 
 // Visualizador HTML web responsive
 app.get('/c/:token', ah(async (req, res) => {
