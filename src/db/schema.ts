@@ -212,8 +212,12 @@ export async function initDatabaseSchema(): Promise<void> {
       paid_at TIMESTAMPTZ
     );
     ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS amount_crc NUMERIC(12,2);
+    ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS checkout_session_id TEXT;
+    ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS payment_intent_id TEXT;
     ALTER TABLE payment_transactions ALTER COLUMN currency SET DEFAULT 'CRC';
     CREATE INDEX IF NOT EXISTS idx_payment_transactions_tenant ON payment_transactions(tenant_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_payment_transactions_checkout_session ON payment_transactions(checkout_session_id);
+    CREATE INDEX IF NOT EXISTS idx_payment_transactions_payment_intent ON payment_transactions(payment_intent_id);
 
     CREATE TABLE IF NOT EXISTS platform_settings (
       key TEXT PRIMARY KEY,
