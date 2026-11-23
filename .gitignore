@@ -8,3 +8,8 @@ certs/
 Llave Criptografica/
 output/
 Pruebas/
+backups/
+*.dump
+*.enc
+*.key
+*.sql.gz
