@@ -266,6 +266,30 @@ app.get('/', (req: Request, res: Response, next: NextFunction) => {
   res.sendFile(path.join(process.cwd(), 'public', 'landing.html'));
 });
 
+// Health check para observabilidad, monitoreo y pruebas de disponibilidad
+app.get(['/api/health', '/api/public/health'], async (req: Request, res: Response) => {
+  try {
+    const start = Date.now();
+    await pool.query('SELECT 1');
+    const dbLatencyMs = Date.now() - start;
+    res.json({
+      status: 'healthy',
+      uptimeSec: Math.floor(process.uptime()),
+      timestamp: new Date().toISOString(),
+      database: { status: 'connected', latencyMs: dbLatencyMs },
+      version: '1.0.0',
+      normativa: 'DGT v4.3',
+      environment: process.env.NODE_ENV || 'production'
+    });
+  } catch (err: any) {
+    res.status(503).json({
+      status: 'unhealthy',
+      error: 'Database connection failed',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Servir la interfaz estática
 app.use(express.static(path.join(process.cwd(), 'public')));
 
@@ -740,16 +764,18 @@ app.post('/api/billing/webhook/:provider', ah(async (req, res) => {
 // Acceso y descarga de comprobantes individuales mediante tokens opacos (256 bits)
 // ==========================================
 
-function setPortalSecurityHeaders(res: Response): void {
+function setPortalSecurityHeaders(res: Response, allowSelfFrame: boolean = false): void {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; script-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none';"
+    allowSelfFrame
+      ? "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; script-src 'none'; frame-ancestors 'self'; base-uri 'none'; form-action 'none';"
+      : "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; script-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none';"
   );
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Frame-Options', allowSelfFrame ? 'SAMEORIGIN' : 'DENY');
 }
 
 function renderErrorComprobanteNoDisponible(res: Response): void {
@@ -948,7 +974,7 @@ app.get('/api/public/portal/comprobante/:clave', ah(async (req, res) => {
 
   // Si la petición solicita HTML (iframe del modal o navegador directo)
   if (req.headers.accept && req.headers.accept.includes('text/html')) {
-    setPortalSecurityHeaders(res);
+    setPortalSecurityHeaders(res, true);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     const compMock: any = {
       ...data.comprobante,

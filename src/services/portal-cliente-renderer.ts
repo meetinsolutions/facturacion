@@ -48,12 +48,12 @@ export function renderPortalClienteAppHTML(esQA: boolean = true): string {
         </div>
       </div>
 
-      <div id="userSessionBadge" class="hidden items-center gap-3">
-        <span class="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1.5">
-          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-          <span id="sessionEmailText" class="font-mono"></span>
+      <div id="userSessionBadge" class="hidden items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap justify-end">
+        <span class="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1.5 max-w-[170px] sm:max-w-none truncate">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
+          <span id="sessionEmailText" class="font-mono truncate"></span>
         </span>
-        <button id="btnLogout" onclick="portalApp.cerrarSesion()" class="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 transition">
+        <button id="btnLogout" onclick="portalApp.cerrarSesion()" class="text-xs text-slate-400 hover:text-white px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 transition shrink-0">
           Cerrar Sesión
         </button>
       </div>
