@@ -83,7 +83,7 @@ export function getFechaPartesCR(date: Date = new Date()): FechaPartesCR {
 
 /**
  * Formatea una fecha a formato estándar ISO 8601 con desplazamiento oficial de Costa Rica (-06:00).
- * Requerido por la estructura XML v4.3 del Ministerio de Hacienda.
+ * Requerido por la estructura XML v4.4 del Ministerio de Hacienda.
  * Ejemplo: 2026-11-21T18:14:53-06:00
  */
 export function formatoFechaIsoCR(date: Date = new Date()): string {

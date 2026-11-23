@@ -132,32 +132,33 @@ async function runTests() {
       }
     };
 
-    // Probar generación de Factura (01)
+    // Probar generación de Factura (01) en v4.4
     const resFactura = generarXMLFactura({ ...testDoc, tipoDocumento: '01' }, 1);
-    assert(resFactura.xml.includes('https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.3/facturaElectronica'), 'Factura debe usar namespace oficial v4.3');
-    assert(!resFactura.xml.includes('v4.4'), 'No debe referenciar v4.4 inexistente');
+    assert(resFactura.xml.includes('https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.4/facturaElectronica'), 'Factura debe usar namespace oficial v4.4');
 
-    // Probar generación de Tiquete (04)
+    // Probar generación de Tiquete (04) en v4.4
     const resTiquete = generarXMLFactura({ ...testDoc, tipoDocumento: '04' }, 2);
-    assert(resTiquete.xml.includes('https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.3/tiqueteElectronico'), 'Tiquete debe usar namespace oficial v4.3');
+    assert(resTiquete.xml.includes('https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.4/tiqueteElectronico'), 'Tiquete debe usar namespace oficial v4.4');
 
-    // Probar Nota de Crédito (03)
+    // Probar Nota de Crédito (03) en v4.4
     const resNC = generarXMLFactura({
       ...testDoc,
       tipoDocumento: '03',
-      informacionReferencia: [
-        {
-          tipoDoc: '01',
-          numero: '50623112600310199988800100001010000000001199999999',
-          fechaEmision: new Date(),
-          codigo: '01',
-          razon: 'Anulacion total de factura'
-        }
-      ]
+      informacionReferencia: {
+        tipoDoc: '01',
+        numero: '50623112600310199988800100001010000000001199999999',
+        fechaEmision: new Date(),
+        codigo: '01',
+        razon: 'Anulacion total de factura'
+      }
     }, 3);
-    assert(resNC.xml.includes('https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.3/notaCreditoElectronica'), 'Nota de Crédito debe usar namespace oficial v4.3');
+    assert(resNC.xml.includes('https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.4/notaCreditoElectronica'), 'Nota de Crédito debe usar namespace oficial v4.4');
 
-    console.log('✅ TEST 4 APROBADO: Generador XML utiliza namespaces y esquemas oficiales DGT v4.3.');
+    // Probar compatibilidad histórica con v4.3
+    const resHist = generarXMLFactura({ ...testDoc, tipoDocumento: '01', versionNormativa: 'v4.3' }, 4);
+    assert(resHist.xml.includes('https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.3/facturaElectronica'), 'Histórico debe usar v4.3');
+
+    console.log('✅ TEST 4 APROBADO: Generador XML utiliza namespaces y esquemas oficiales DGT v4.4 (con soporte histórico v4.3).');
 
     console.log('\n======================================================');
     console.log('🎉 TODAS LAS PRUEBAS FOCALIZADAS FUERON SUPERADAS AL 100%');

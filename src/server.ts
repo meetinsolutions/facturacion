@@ -294,7 +294,7 @@ app.get('/api/health', async (req: Request, res: Response) => {
       timestamp: new Date().toISOString(),
       database: { status: 'connected', latencyMs: dbLatencyMs },
       version: '1.0.0',
-      normativa: 'DGT v4.3',
+      normativa: 'DGT v4.4',
       environment: process.env.NODE_ENV || 'production'
     });
   } catch (err: any) {

@@ -202,7 +202,7 @@ export async function enviarComprobantePorCorreo(params: {
           </p>
         </div>
         <div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:14px 28px;text-align:center;font-size:11px;color:#94a3b8;">
-          Comprobante Electrónico • Costa Rica DGT v4.3
+          Comprobante Electrónico • Costa Rica DGT v4.4
         </div>
       </div>
     </div>

@@ -136,14 +136,14 @@ async function runHaciendaPrepTests() {
     assert.strictEqual(resXml.consecutivo.length, 20, 'Consecutivo debe tener exactamente 20 dígitos según DGT v4.3');
     assert(resXml.clave.startsWith('506'), 'Clave debe iniciar con código de país 506 (Costa Rica)');
 
-    // Verificación de esquema XSD y namespace oficial v4.3
+    // Verificación de esquema XSD y namespace oficial v4.4
     assert(
-      resXml.xml.includes('https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.3/facturaElectronica'),
-      'Namespace oficial DGT v4.3 debe estar presente en Factura'
+      resXml.xml.includes('https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.4/facturaElectronica'),
+      'Namespace oficial DGT v4.4 debe estar presente en Factura'
     );
-    assert(!resXml.xml.includes('v4.4'), 'No debe existir referencia a versión v4.4 inexistente');
+    assert(resXml.xml.includes('xsi:schemaLocation="https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.4/facturaElectronica'), 'Debe referenciar schemaLocation v4.4');
 
-    record(2, 'Conformidad Normativa DGT v4.3 Oficial', true, 'Clave (50d), consecutivo (20d), CAByS (13d) y namespaces v4.3 conformes.');
+    record(2, 'Conformidad Normativa DGT v4.4 Oficial', true, 'Clave (50d), consecutivo (20d), CAByS (13d) y namespaces v4.4 conformes.');
   } catch (err: any) {
     record(2, 'Conformidad Normativa DGT v4.3 Oficial', false, err.message);
     throw err;
@@ -155,7 +155,7 @@ async function runHaciendaPrepTests() {
   try {
     const p12Buffer = generarCertificadoPruebaP12('1234');
     const certInfo = cargarCertificadoP12(p12Buffer, '1234');
-    const xmlBase = '<FacturaElectronica xmlns="https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.3/facturaElectronica"><Clave>50623112600310199988800100001010000000001199999999</Clave></FacturaElectronica>';
+    const xmlBase = '<FacturaElectronica xmlns="https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.4/facturaElectronica"><Clave>50623112600310199988800100001010000000001199999999</Clave></FacturaElectronica>';
 
     const xmlFirmado = firmarXMLFactura(xmlBase, certInfo);
     assert(xmlFirmado.includes('ds:Signature'), 'El XML firmado debe incluir la etiqueta ds:Signature');

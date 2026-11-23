@@ -163,12 +163,13 @@ export interface ComprobanteElectronico {
   receptor?: ReceptorCliente;
   lineas: LineaDetalleVenta[];
   resumen: ResumenFactura;
-  // Referencias para Notas de Crédito / Débito
+  versionNormativa?: 'v4.4' | 'v4.3';
+  // Referencias para Notas de Crédito / Débito (Soporta catálogos oficiales v4.4 y referencias históricas v4.3)
   informacionReferencia?: {
-    tipoDoc: TipoDocumento;
-    numero: string;            // Clave del comprobante de referencia
+    tipoDoc: string;            // '01'..'04', '08', '09', '19', '20' o claves DGT
+    numero: string;            // Clave o consecutivo del comprobante de referencia
     fechaEmision: Date;
-    codigo: '01' | '02' | '03' | '04' | '05' | '99'; // Anula, Corrige texto, Corrige monto, etc.
+    codigo: string;            // Códigos v4.4: 01, 02, 03, 04, 05, 12, 13, 14, 15, 16, 17, 99
     razon: string;
   };
 }

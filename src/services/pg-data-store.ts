@@ -34,7 +34,7 @@ function defaultConfig(): ConfigSistemaConCert {
     },
     sitio: {
       nombreSistema: 'Facturación CR',
-      subtitulo: 'Costa Rica • DGT v4.3',
+      subtitulo: 'Costa Rica • DGT v4.4',
       moneda: 'CRC',
       simboloMoneda: 'CRC',
       logoBase64: '',

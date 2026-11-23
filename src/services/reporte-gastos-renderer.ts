@@ -729,7 +729,7 @@ export function generarReporteGastosHTML(params: ParametrosReporteGastos): strin
             ${cedulaEmpresa ? `<div><strong>Cédula:</strong> ${escapeHtml(cedulaEmpresa)}</div>` : ''}
             ${correoEmpresa ? `<div><strong>Email:</strong> ${escapeHtml(correoEmpresa)}</div>` : ''}
             ${telEmpresa ? `<div><strong>Teléfono:</strong> ${escapeHtml(telEmpresa)}</div>` : ''}
-            <div><strong>Sistema:</strong> Facturación Electrónica v4.3 DGT</div>
+            <div><strong>Sistema:</strong> Facturación Electrónica v4.4 DGT</div>
           </div>
         </div>
       </div>
@@ -901,7 +901,7 @@ export function generarReporteGastosHTML(params: ParametrosReporteGastos): strin
     <footer class="report-footer">
       <div class="audit-note">
         <strong>Declaración de Conciliación y Cumplimiento Tributario:</strong>
-        El presente reporte resume los comprobantes electrónicos procesados, validados y certificados bajo los esquemas oficiales v4.3 del Ministerio de Hacienda de Costa Rica. La información aquí contenida respalda la liquidación de créditos fiscales del Impuesto sobre el Valor Agregado (IVA) y deducciones aplicables al Impuesto sobre la Renta.
+        El presente reporte resume los comprobantes electrónicos procesados, validados y certificados bajo los esquemas oficiales v4.4 del Ministerio de Hacienda de Costa Rica (con soporte de históricos v4.3). La información aquí contenida respalda la liquidación de créditos fiscales del Impuesto sobre el Valor Agregado (IVA) y deducciones aplicables al Impuesto sobre la Renta.
       </div>
 
       <div class="signatures-grid">

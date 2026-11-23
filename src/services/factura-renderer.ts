@@ -1303,7 +1303,7 @@ export async function generarFacturaEleganteHTML(data: FacturaRenderData): Promi
             <h4>${escapeHtml(d.etiquetaOperacion)}</h4>
             <div class="primary-val">${escapeHtml(moneda)} (${simboloMoneda})${tipoCambio && moneda !== 'CRC' ? ` • T.C. ¢${Number(tipoCambio).toFixed(2)}` : ''}</div>
             <div class="sub-line">Medio de Pago: ${escapeHtml(mediosPagoTexto)}</div>
-            <div class="sub-line">Normativa: Ministerio de Hacienda DGT v4.3</div>
+            <div class="sub-line">Normativa: Ministerio de Hacienda DGT v4.4</div>
             <div class="sub-line">Estado: ${esBorrador ? 'Vista Previa sin emitir' : 'Firmado Digitalmente XAdES-BES'}</div>
           </div>
           ` : ''}

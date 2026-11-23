@@ -200,7 +200,7 @@ export async function registrarTenantYAdmin(input: {
     };
     const sitioJson = {
       nombreSistema: nombreEmpresa,
-      subtitulo: 'Costa Rica • DGT v4.3',
+      subtitulo: 'Costa Rica • DGT v4.4',
       moneda: 'CRC',
       simboloMoneda: 'CRC',
       logoBase64: '',

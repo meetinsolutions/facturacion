@@ -20,50 +20,73 @@ export function formatoFechaCR(fecha: Date): string {
 }
 
 /**
- * Mapea el tipo de documento a la etiqueta raíz XML según v4.3
+ * Mapea el tipo de documento a la etiqueta raíz XML y namespace según versión DGT (v4.4 por defecto, v4.3 histórico)
  */
-function getRootElement(tipoDoc: TipoDocumento): { rootName: string; schemaUrl: string } {
+export function getRootElement(tipoDoc: string, version: 'v4.4' | 'v4.3' = 'v4.4'): { rootName: string; schemaUrl: string } {
+  const v = version === 'v4.3' ? '4.3' : '4.4';
+
   switch (tipoDoc) {
     case '01':
       return {
         rootName: 'FacturaElectronica',
-        schemaUrl: 'https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.3/facturaElectronica'
+        schemaUrl: `https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v${v}/facturaElectronica`
       };
     case '02':
       return {
         rootName: 'NotaDebitoElectronica',
-        schemaUrl: 'https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.3/notaDebitoElectronica'
+        schemaUrl: `https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v${v}/notaDebitoElectronica`
       };
     case '03':
       return {
         rootName: 'NotaCreditoElectronica',
-        schemaUrl: 'https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.3/notaCreditoElectronica'
+        schemaUrl: `https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v${v}/notaCreditoElectronica`
       };
     case '04':
       return {
         rootName: 'TiqueteElectronico',
-        schemaUrl: 'https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.3/tiqueteElectronico'
+        schemaUrl: `https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v${v}/tiqueteElectronico`
       };
     case '05':
+    case '09':
       return {
         rootName: 'FacturaElectronicaExportacion',
-        schemaUrl: 'https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.3/facturaElectronicaExportacion'
+        schemaUrl: `https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v${v}/facturaElectronicaExportacion`
       };
     case '06':
+    case '08':
       return {
         rootName: 'FacturaElectronicaCompra',
-        schemaUrl: 'https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.3/facturaElectronicaCompra'
+        schemaUrl: `https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v${v}/facturaElectronicaCompra`
       };
     default:
-      throw new Error(`Tipo de documento no soportado: ${tipoDoc}`);
+      throw new Error(`Tipo de documento no soportado por la normativa DGT: ${tipoDoc}`);
   }
 }
 
+// Catálogo oficial DGT v4.4 Nota 9: Códigos de referencia y efecto contable
+export const CODIGOS_REFERENCIA_V44 = [
+  '01', // Anula Documento de Referencia
+  '02', // Corrige texto de documento de referencia
+  '03', // Corrige montos
+  '04', // Referencia a otro documento
+  '05', // Sustituye comprobante provisional por contingencia
+  '12', // Ajuste por efectos contables del crédito
+  '13', // Efecto contable en el período fiscal de emisión
+  '14', // Efecto contable devengado
+  '15', // Ajuste fiscal diferido
+  '16', // Referencia a un comprobante electrónico previamente rechazado
+  '17', // Aplicación de pago en Recibo Electrónico de Pago (REP)
+  '99'  // Otros
+];
+
 /**
- * Construye el XML oficial según la especificación DGT v4.3 de Costa Rica
+ * Construye el XML oficial según la especificación DGT v4.4 de Costa Rica
+ * (Mantiene compatibilidad con v4.3 para notas de ajuste o consulta de históricos).
  */
 export function generarXMLFactura(doc: ComprobanteElectronico, secuencia: number): { xml: string; clave: string; consecutivo: string } {
-  // 0. Validaciones normativas DGT v4.3
+  const version = doc.versionNormativa || 'v4.4';
+
+  // 0. Validaciones normativas DGT (v4.4 / v4.3)
   if (!(doc.fechaEmision instanceof Date) || Number.isNaN(doc.fechaEmision.getTime())) {
     throw new Error('La fecha de emisión del comprobante es inválida.');
   }
@@ -73,15 +96,22 @@ export function generarXMLFactura(doc: ComprobanteElectronico, secuencia: number
   }
 
   if (!doc.emisor.actividadEconomica || !/^\d{6}$/.test(doc.emisor.actividadEconomica)) {
-    throw new Error(`El código de actividad económica del emisor debe tener exactamente 6 dígitos numéricos. Recibido: "${doc.emisor.actividadEconomica}"`);
+    throw new Error(`El código de actividad económica del emisor debe tener exactamente 6 dígitos numéricos según DGT. Recibido: "${doc.emisor.actividadEconomica}"`);
   }
 
   if (doc.tipoDocumento === '01' && (!doc.receptor || !doc.receptor.identificacion?.numero)) {
-    throw new Error('La Factura Electrónica (01) requiere obligatoriamente la identificación del Receptor según la normativa DGT v4.3.');
+    throw new Error('La Factura Electrónica (01) requiere obligatoriamente la identificación del Receptor según la normativa DGT.');
   }
 
   if ((doc.tipoDocumento === '02' || doc.tipoDocumento === '03') && !doc.informacionReferencia) {
-    throw new Error(`Las notas de débito y crédito (${doc.tipoDocumento}) requieren obligatoriamente el nodo InformacionReferencia según la normativa DGT v4.3.`);
+    throw new Error(`Las notas de débito y crédito (${doc.tipoDocumento}) requieren obligatoriamente el nodo InformacionReferencia según la normativa DGT.`);
+  }
+
+  if (doc.informacionReferencia) {
+    const codRef = String(doc.informacionReferencia.codigo);
+    if (!CODIGOS_REFERENCIA_V44.includes(codRef)) {
+      throw new Error(`Código de referencia "${codRef}" no reconocido en el catálogo oficial DGT v4.4 (Nota 9).`);
+    }
   }
 
   if (doc.resumen?.codigoMoneda && doc.resumen.codigoMoneda !== 'CRC' && (!doc.resumen.tipoCambio || doc.resumen.tipoCambio <= 0)) {
@@ -94,11 +124,11 @@ export function generarXMLFactura(doc: ComprobanteElectronico, secuencia: number
 
   for (const item of doc.lineas) {
     if (!item.codigoCabys || !/^\d{13}$/.test(item.codigoCabys)) {
-      throw new Error(`El código CAByS de la línea ${item.numeroLinea} debe tener exactamente 13 dígitos numéricos. Recibido: "${item.codigoCabys}"`);
+      throw new Error(`El código CAByS de la línea ${item.numeroLinea} debe tener exactamente 13 dígitos numéricos según DGT. Recibido: "${item.codigoCabys}"`);
     }
   }
 
-  const { rootName, schemaUrl } = getRootElement(doc.tipoDocumento);
+  const { rootName, schemaUrl } = getRootElement(doc.tipoDocumento, version);
 
   // 1. Asegurar consecutivo y clave si no vienen asignados
   const consecutivo = doc.consecutivo || generarConsecutivo(
@@ -116,7 +146,7 @@ export function generarXMLFactura(doc: ComprobanteElectronico, secuencia: number
 
   const fechaEmisionStr = formatoFechaCR(doc.fechaEmision);
 
-  // 2. Crear documento XML con namespaces
+  // 2. Crear documento XML con namespaces oficiales v4.4
   const root = create({ version: '1.0', encoding: 'UTF-8' })
     .ele(rootName, {
       xmlns: schemaUrl,
@@ -132,12 +162,12 @@ export function generarXMLFactura(doc: ComprobanteElectronico, secuencia: number
   root.ele('NumeroConsecutivo').txt(consecutivo).up();
   root.ele('FechaEmision').txt(fechaEmisionStr).up();
 
-  // Emisor
+  // Emisor (Permite cédulas jurídicas alfanuméricas según v4.4)
   const emisorNode = root.ele('Emisor');
   emisorNode.ele('Nombre').txt(doc.emisor.nombre).up();
   const emisorId = emisorNode.ele('Identificacion');
   emisorId.ele('Tipo').txt(doc.emisor.identificacion.tipo).up();
-  emisorId.ele('Numero').txt(doc.emisor.identificacion.numero.replace(/\D/g, '')).up();
+  emisorId.ele('Numero').txt(doc.emisor.identificacion.numero.replace(/[^a-zA-Z0-9]/g, '')).up();
   if (doc.emisor.nombreComercial) {
     emisorNode.ele('NombreComercial').txt(doc.emisor.nombreComercial).up();
   }
@@ -157,14 +187,14 @@ export function generarXMLFactura(doc: ComprobanteElectronico, secuencia: number
   }
   emisorNode.ele('CorreoElectronico').txt(doc.emisor.correo).up();
 
-  // Receptor (Opcional en Tiquete Electrónico 04, Obligatorio en Factura 01)
+  // Receptor (Opcional en Tiquete Electrónico 04, Obligatorio en Factura 01, soporte alfanumérico v4.4)
   if (doc.receptor) {
     const receptorNode = root.ele('Receptor');
     receptorNode.ele('Nombre').txt(doc.receptor.nombre).up();
     if (doc.receptor.identificacion) {
       const recId = receptorNode.ele('Identificacion');
       recId.ele('Tipo').txt(doc.receptor.identificacion.tipo).up();
-      recId.ele('Numero').txt(doc.receptor.identificacion.numero.replace(/\D/g, '')).up();
+      recId.ele('Numero').txt(doc.receptor.identificacion.numero.replace(/[^a-zA-Z0-9]/g, '')).up();
     }
     if (doc.receptor.nombreComercial) {
       receptorNode.ele('NombreComercial').txt(doc.receptor.nombreComercial).up();
