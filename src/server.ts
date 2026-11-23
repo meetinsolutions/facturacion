@@ -1212,14 +1212,16 @@ app.post('/api/superadmin/tenants/:id/estado', requireSuperAdmin, ah(async (req,
 
 app.post('/api/superadmin/pagos/:id/aprobar', requireSuperAdmin, ah(async (req, res) => {
   try {
-    res.json({ success: true, data: await aprobarPagoManual(String(req.params.id)) });
+    const adminInfo = { userId: req.auth?.userId, email: req.auth?.email };
+    res.json({ success: true, data: await aprobarPagoManual(String(req.params.id), adminInfo) });
   } catch (err: any) {
     res.status(400).json({ success: false, error: err.message });
   }
 }));
 
 app.post('/api/superadmin/pagos/:id/rechazar', requireSuperAdmin, ah(async (req, res) => {
-  await rechazarPagoManual(String(req.params.id), req.body?.motivo);
+  const adminInfo = { userId: req.auth?.userId, email: req.auth?.email };
+  await rechazarPagoManual(String(req.params.id), req.body?.motivo, adminInfo);
   res.json({ success: true });
 }));
 

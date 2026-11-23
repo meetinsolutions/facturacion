@@ -712,6 +712,18 @@ export async function reportarPagoSinpe(
     throw new Error('Debe indicar el número de comprobante o referencia SINPE.');
   }
 
+  // Prevenir comprobantes/referencias SINPE duplicadas ya registradas en estado pending o paid
+  const existingRef = await pool.query(
+    `SELECT id, status FROM payment_transactions
+     WHERE provider = 'manual_sinpe'
+       AND LOWER(TRIM(provider_reference)) = LOWER($1)
+       AND status IN ('paid', 'pending')`,
+    [referencia]
+  );
+  if (existingRef.rowCount && existingRef.rowCount > 0) {
+    throw new Error(`El número de comprobante o referencia SINPE "${referencia}" ya ha sido reportado previamente.`);
+  }
+
   const plan = mapPlan(planRes.rows[0]);
   const amountUsd = input.billingCycle === 'yearly' ? plan.precio_anual_usd : plan.precio_mensual_usd;
   const subRes = await pool.query('SELECT id FROM subscriptions WHERE tenant_id = $1', [tenantId]);
@@ -1015,6 +1027,40 @@ export async function procesarWebhook(provider: string, body: any) {
       }
     }
 
+    // Búsqueda por payment_intent_id si no vino en metadata ni por sessionId
+    if (!transactionId && paymentIntentId) {
+      const lookup = await pool.query(
+        `SELECT id FROM payment_transactions WHERE payment_intent_id = $1 LIMIT 1`,
+        [paymentIntentId]
+      );
+      if (lookup.rowCount) {
+        transactionId = lookup.rows[0].id;
+      }
+    }
+
+    // Diferenciación de cobros recurrentes reales:
+    // Si ONVO debita un ciclo recurrente en tarjeta para un tenant registrado,
+    // se genera una transacción de renovación automática vinculada a su suscripción.
+    if (!transactionId && metadata.tenantId && (paymentIntentId || sessionId)) {
+      const subRes = await pool.query('SELECT * FROM subscriptions WHERE tenant_id = $1', [metadata.tenantId]);
+      if (subRes.rowCount) {
+        const sub = subRes.rows[0];
+        const planCode = metadata.planCode || sub.plan_code;
+        const cycle = (metadata.billingCycle || sub.billing_cycle || 'monthly') as 'monthly' | 'yearly';
+        const planRes = await pool.query('SELECT * FROM plans WHERE code = $1', [planCode]);
+        const plan = planRes.rows[0];
+        const amountUsd = cycle === 'yearly' ? Number(plan?.precio_anual_usd || 0) : Number(plan?.precio_mensual_usd || 0);
+
+        const newTxId = crypto.randomUUID();
+        await pool.query(
+          `INSERT INTO payment_transactions (id, tenant_id, subscription_id, plan_code, billing_cycle, amount_usd, currency, provider, status, checkout_session_id, payment_intent_id, comprobante_notas)
+           VALUES ($1, $2, $3, $4, $5, $6, 'USD', 'onvopay', 'pending', $7, $8, $9)`,
+          [newTxId, metadata.tenantId, sub.id, planCode, cycle, amountUsd, sessionId || null, paymentIntentId || null, 'Renovación automática recurrente ONVO']
+        );
+        transactionId = newTxId;
+      }
+    }
+
     if (!transactionId) {
       console.warn('[ONVO WEBHOOK] Evento recibido sin transactionId identificable.');
       return { received: true, ignored: true, error: 'transactionId no identificado' };
@@ -1200,16 +1246,34 @@ export async function asignarPlanManual(
   );
 }
 
-export async function aprobarPagoManual(txId: string) {
-  return await completarPagoYActivarSuscripcion(txId, 'manual_sinpe');
+export async function aprobarPagoManual(txId: string, adminInfo?: { userId?: string; email?: string }) {
+  const result = await completarPagoYActivarSuscripcion(txId, 'manual_sinpe');
+  if (adminInfo) {
+    const auditMsg = `[AUDITORÍA] Pago aprobado por administrador: ${adminInfo.email || adminInfo.userId || 'superadmin'} (${new Date().toISOString()})`;
+    await pool.query(
+      `UPDATE payment_transactions
+       SET comprobante_notas = CASE 
+         WHEN comprobante_notas IS NULL OR comprobante_notas = '' THEN $2
+         ELSE comprobante_notas || ' | ' || $2
+       END
+       WHERE id = $1`,
+      [txId, auditMsg]
+    );
+  }
+  return result;
 }
 
-export async function rechazarPagoManual(txId: string, motivo?: string) {
+export async function rechazarPagoManual(txId: string, motivo?: string, adminInfo?: { userId?: string; email?: string }) {
+  const auditMsg = `[AUDITORÍA] Pago rechazado por admin ${adminInfo?.email || adminInfo?.userId || 'superadmin'}: ${motivo || 'Sin motivo especificado'}`;
   await pool.query(
     `UPDATE payment_transactions
-     SET status = 'failed', comprobante_notas = COALESCE($2, comprobante_notas)
-     WHERE id = $1`,
-    [txId, motivo || null]
+     SET status = 'failed',
+         comprobante_notas = CASE 
+           WHEN comprobante_notas IS NULL OR comprobante_notas = '' THEN $2
+           ELSE comprobante_notas || ' | ' || $2
+         END
+     WHERE id = $1 AND status = 'pending'`,
+    [txId, auditMsg]
   );
 }
 
