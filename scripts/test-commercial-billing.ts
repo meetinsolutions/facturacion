@@ -580,6 +580,7 @@ async function runCommercialSuite() {
   console.log('\n======================================================================');
   console.log(`RESULTADO DE LA SUITE COMERCIAL: ${passed}/${total} PRUEBAS EXITOSAS`);
   console.log('======================================================================\n');
+  process.exit(0);
 }
 
 runCommercialSuite().catch(err => {
