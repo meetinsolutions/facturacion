@@ -13,6 +13,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
+import 'dotenv/config';
 import axios from 'axios';
 import { generarXMLFactura } from '../src/services/xml-builder.js';
 import { firmarXMLFactura, verificarFirmaXML, cargarCertificadoP12, CertificadoInfo } from '../src/services/xml-signer.js';
@@ -85,8 +86,9 @@ async function main() {
   const password = process.env.HACIENDA_PASSWORD;
   const pin = process.env.HACIENDA_PIN;
   const p12Path = process.env.HACIENDA_P12_PATH;
-  const emisorCedula = process.env.HACIENDA_EMISOR_CEDULA || '3102890123';
-  const emisorNombre = process.env.HACIENDA_EMISOR_NOMBRE || 'MEETINLABS COSTA RICA S.R.L. (PRUEBAS)';
+  const emisorTipoId = process.env.HACIENDA_EMISOR_TIPO_ID || (username?.startsWith('cpf-') ? '01' : '02');
+  const emisorCedula = process.env.HACIENDA_EMISOR_CEDULA || (username?.startsWith('cpf-') ? '106630896' : '3102890123');
+  const emisorNombre = process.env.HACIENDA_EMISOR_NOMBRE || (username?.startsWith('cpf-') ? 'GIOVANNI ALBERTO IEZZI FERNANDEZ' : 'MEETINLABS COSTA RICA S.R.L. (PRUEBAS)');
   const emisorActividad = process.env.HACIENDA_EMISOR_ACTIVIDAD || '620101';
 
   const faltantes: string[] = [];
@@ -130,7 +132,7 @@ async function main() {
     versionNormativa: 'v4.4',
     emisor: {
       nombre: emisorNombre,
-      identificacion: { tipo: '02', numero: emisorCedula },
+      identificacion: { tipo: emisorTipoId as any, numero: emisorCedula },
       actividadEconomica: emisorActividad,
       sucursal: 1,
       terminal: 1,
@@ -291,7 +293,7 @@ async function main() {
     clave,
     fecha: new Date().toISOString(),
     emisor: {
-      tipoIdentificacion: '02',
+      tipoIdentificacion: emisorTipoId,
       numeroIdentificacion: emisorCedula
     },
     receptor: {
