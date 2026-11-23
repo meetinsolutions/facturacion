@@ -205,15 +205,22 @@ export async function getEstadoSuscripcion(tenantId: string) {
     pasarelaActiva: gateways.pasarelaActiva,
     sinpeInfo: gateways.sinpe,
     pagos: pagosRes.rows.map(p => {
-      const amountCrc = Number(p.amount_crc ?? p.amount_usd ?? 0);
+      const isCrc = (p.currency || 'CRC').toUpperCase() === 'CRC';
+      const amountCrc = p.amount_crc != null ? Number(p.amount_crc) : (isCrc ? Number(p.amount_usd || 0) : null);
+      const amountUsd = Number(p.amount_usd || 0);
+      const currency = (p.currency || (p.amount_crc != null ? 'CRC' : 'USD')).toUpperCase();
+      const amountFormatted = currency === 'USD'
+        ? `$${amountUsd.toFixed(2)}`
+        : formatCRC(amountCrc ?? amountUsd);
+
       return {
         id: p.id,
         planCode: p.plan_code,
         billingCycle: p.billing_cycle,
         amountCrc,
-        amountUsd: Number(p.amount_usd),
-        currency: p.currency || 'CRC',
-        amountFormatted: formatCRC(amountCrc),
+        amountUsd,
+        currency,
+        amountFormatted,
         provider: p.provider,
         providerReference: p.provider_reference,
         status: p.status,
@@ -862,14 +869,14 @@ export async function confirmarPagoOnvo(
       throw new Error(`Discrepancia de ciclo: esperado ${tx.billing_cycle}, recibido ${eventData.billingCycle}.`);
     }
 
-    // 8. Coincidencia de importe y moneda
+    // 8. Coincidencia estricta de importe y moneda (minor units en céntimos para CRC y centavos para USD)
     if (eventData.amountInCents !== undefined && eventData.amountInCents !== null) {
-      const txAmount = Number(tx.amount_crc ?? tx.amount_usd);
-      const expectedCents = Math.round(txAmount * 100);
-      const expectedWhole = Math.round(txAmount);
+      const isCrc = (tx.currency || 'CRC').toUpperCase() === 'CRC';
+      const txAmount = Number(isCrc ? (tx.amount_crc ?? tx.amount_usd) : tx.amount_usd);
+      const expectedMinorUnits = Math.round(txAmount * 100);
       const received = Number(eventData.amountInCents);
-      if (received !== expectedCents && received !== expectedWhole) {
-        throw new Error(`Discrepancia de importe: esperado ${expectedCents} (o ${expectedWhole}), recibido ${received}.`);
+      if (received !== expectedMinorUnits) {
+        throw new Error(`Discrepancia de importe: esperado ${expectedMinorUnits} céntimos/centavos de ${tx.currency}, recibido ${received}.`);
       }
     }
     if (eventData.currency) {
@@ -1253,7 +1260,7 @@ export async function getSuperAdminDashboard() {
               COALESCE(SUM(CASE WHEN s.billing_cycle = 'yearly' THEN p.precio_anual_usd / 12.0 ELSE p.precio_mensual_usd END), 0) AS mrr_usd
        FROM subscriptions s
        JOIN plans p ON p.code = s.plan_code
-       WHERE s.status = 'active' AND s.provider <> 'owner'`
+       WHERE s.status = 'active' AND s.provider <> 'owner' AND s.plan_code <> 'trial'`
     ),
     listarPlanes()
   ]);

@@ -5377,7 +5377,7 @@
       document.getElementById('sus-pagos').innerHTML = pagos.length ? `
         <table class="w-full text-left"><thead class="text-slate-500"><tr><th class="py-2">Fecha</th><th>Plan</th><th>Ciclo</th><th>Monto</th><th>Método</th><th>Referencia</th><th>Estado</th></tr></thead>
         <tbody>${pagos.map(x => `<tr class="border-t"><td class="py-2">${fmtFechaSaas(x.createdAt)}</td><td>${escSaas(x.planCode)}</td><td>${x.billingCycle === 'yearly' ? 'Anual' : 'Mensual'}</td>
-          <td class="font-mono">${fmtCRC(x.amountCrc ?? x.amountUsd)}</td><td>${escSaas(x.provider)}</td><td class="font-mono">${escSaas(x.providerReference || '')}</td>
+          <td class="font-mono">${x.amountFormatted || (x.currency === 'USD' ? '$' + Number(x.amountUsd).toFixed(2) : fmtCRC(x.amountCrc ?? x.amountUsd))}</td><td>${escSaas(x.provider)}</td><td class="font-mono">${escSaas(x.providerReference || '')}</td>
           <td><span class="px-2 py-0.5 rounded-full font-bold ${stPago[x.status] || 'bg-slate-100'}">${escSaas(x.status)}</span></td></tr>`).join('')}</tbody></table>`
         : '<p class="text-slate-500">Sin pagos registrados.</p>';
     }
@@ -5538,7 +5538,7 @@
       document.getElementById('sa-pagos').innerHTML = d.pagosPendientes.length ? `
         <table class="w-full text-left"><thead class="text-slate-500"><tr><th class="py-2">Fecha</th><th>Empresa</th><th>Plan</th><th>Monto</th><th>Referencia</th><th>Notas</th><th></th></tr></thead>
         <tbody>${d.pagosPendientes.map(p => `<tr class="border-t"><td class="py-2">${fmtFechaSaas(p.created_at)}</td><td class="font-bold">${escSaas(p.tenant_nombre)}</td>
-          <td>${escSaas(p.plan_nombre)} (${p.billing_cycle === 'yearly' ? 'anual' : 'mensual'})</td><td class="font-mono">${fmtCRC(p.amount_crc ?? p.amount_usd)}</td>
+          <td>${escSaas(p.plan_nombre)} (${p.billing_cycle === 'yearly' ? 'anual' : 'mensual'})</td><td class="font-mono">${p.currency === 'USD' ? '$' + Number(p.amount_usd).toFixed(2) : fmtCRC(p.amount_crc ?? p.amount_usd)}</td>
           <td class="font-mono">${escSaas(p.provider_reference)}</td><td>${escSaas(p.comprobante_notas || '')}</td>
           <td class="text-right space-x-2"><button onclick="saPago('${p.id}', 'aprobar')" class="px-2 py-1 bg-emerald-600 text-white rounded-lg font-bold">Aprobar</button>
           <button onclick="saPago('${p.id}', 'rechazar')" class="px-2 py-1 bg-rose-600 text-white rounded-lg font-bold">Rechazar</button></td></tr>`).join('')}</tbody></table>`
