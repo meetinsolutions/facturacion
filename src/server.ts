@@ -99,19 +99,40 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '127.0.0.1';
 
-// Orígenes autorizados para peticiones cross-origin con credenciales
-const ALLOWED_CORS_ORIGINS = [
-  process.env.PUBLIC_APP_URL,
-  process.env.APP_URL,
+// Determinar si corre en producción real o en entorno de pruebas/QA
+const isProduction =
+  process.env.NODE_ENV === 'production' &&
+  !process.env.PUBLIC_APP_URL?.includes('test-facturacion') &&
+  !process.env.APP_URL?.includes('test-facturacion');
+
+// Orígenes autorizados estrictamente separados por entorno (CORS y anti-CSRF)
+const QA_ORIGINS = [
   'https://test-facturacion.meetinlabs.com',
-  'https://facturacion.meetinlabs.com',
   'http://localhost:3000',
-  'http://localhost:3050',
   'http://localhost:3055',
   'http://127.0.0.1:3000',
-  'http://127.0.0.1:3050',
   'http://127.0.0.1:3055'
-].filter(Boolean).map(o => (o as string).replace(/\/+$/, ''));
+];
+
+const PROD_ORIGINS = [
+  'https://facturacion.meetinlabs.com',
+  'http://localhost:3050',
+  'http://127.0.0.1:3050'
+];
+
+const baseOrigins = isProduction ? PROD_ORIGINS : QA_ORIGINS;
+const configuredOrigins = [process.env.PUBLIC_APP_URL, process.env.APP_URL]
+  .filter(Boolean)
+  .map(o => (o as string).replace(/\/+$/, ''))
+  .filter(o => {
+    if (isProduction) {
+      return !o.includes('test-facturacion');
+    } else {
+      return !o.includes('://facturacion.meetinlabs.com');
+    }
+  });
+
+const ALLOWED_CORS_ORIGINS = Array.from(new Set([...baseOrigins, ...configuredOrigins]));
 
 // Configuración CORS segura (prevención estricta de reflejo de orígenes arbitrarios con credenciales)
 app.use(cors({
@@ -122,7 +143,7 @@ app.use(cors({
     if (ALLOWED_CORS_ORIGINS.includes(clean)) {
       return callback(null, true);
     }
-    // Denegar explícitamente cualquier origen no registrado
+    // Denegar explícitamente cualquier origen no registrado (no se establece Access-Control-Allow-Origin)
     return callback(null, false);
   },
   credentials: true
@@ -143,23 +164,35 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // Protección Anti-CSRF para solicitudes con mutación de estado
 app.use((req: Request, res: Response, next: NextFunction) => {
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
-    // Excluir webhooks públicos de pago y portal público OTP / comprobantes
-    if (
-      req.path.startsWith('/api/billing/webhook/') ||
-      req.path.startsWith('/api/public/') ||
-      req.path.startsWith('/c/')
-    ) {
+    // Excluir exclusivamente webhooks de pago externos firmados (autenticados por HMAC de proveedor)
+    if (req.path.startsWith('/api/billing/webhook/')) {
       return next();
     }
 
-    const origin = (req.headers['origin'] || req.headers['referer']) as string | undefined;
-    if (origin) {
-      try {
-        const originUrl = new URL(origin);
-        const originClean = `${originUrl.protocol}//${originUrl.host}`;
-        const reqHost = req.headers['host'];
+    const rawOrigin = (req.headers['origin'] || req.headers['referer']) as string | undefined;
+    const hasAuthCookie = Boolean(
+      req.cookies?.[AUTH_COOKIE_NAME] ||
+      req.cookies?.portal_session
+    );
 
-        const isSameHost = reqHost && originUrl.host === reqHost;
+    // 1. Si viaja con cookie de sesión y carece de Origin/Referer, rechazar para evitar CSRF sin origen
+    if (hasAuthCookie && !rawOrigin) {
+      return res.status(403).json({
+        success: false,
+        error: 'Solicitud autenticada rechazada: falta encabezado Origin/Referer requerido para mutaciones de estado.'
+      });
+    }
+
+    // 2. Si se incluye Origin o Referer (sea pública o autenticada), verificar que provenga de un origen autorizado
+    if (rawOrigin) {
+      try {
+        const originUrl = new URL(rawOrigin);
+        const originClean = `${originUrl.protocol}//${originUrl.host}`;
+        const reqHost = ((req.headers['x-forwarded-host'] || req.headers['host']) as string | undefined)
+          ?.split(',')[0]
+          ?.trim();
+
+        const isSameHost = Boolean(reqHost && originUrl.host === reqHost);
         const isAllowedOrigin = ALLOWED_CORS_ORIGINS.includes(originClean);
 
         if (!isSameHost && !isAllowedOrigin) {

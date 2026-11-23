@@ -237,17 +237,25 @@ export class PgDataStore {
     >;
 
     // Preservar contraseñas cifradas actuales si el payload no las incluye o envía valores vacíos/enmascarados
+    const isMaskedOrEmpty = (v: any) => {
+      if (v === undefined || v === null) return true;
+      const s = String(v).trim();
+      if (!s) return true;
+      if (s.includes('•••') || s.includes('***') || /^[*•\.\-_]+$/.test(s)) return true;
+      return false;
+    };
+
     let hPass = actual.hacienda?.password || '';
-    if (data.hacienda?.password && !data.hacienda.password.includes('•••') && data.hacienda.password.trim() !== '') {
-      hPass = data.hacienda.password;
+    if (!isMaskedOrEmpty(data.hacienda?.password)) {
+      hPass = String(data.hacienda!.password);
     }
     let hPin = actual.hacienda?.pin || '';
-    if (data.hacienda?.pin && !data.hacienda.pin.includes('•••') && data.hacienda.pin.trim() !== '') {
-      hPin = data.hacienda.pin;
+    if (!isMaskedOrEmpty(data.hacienda?.pin)) {
+      hPin = String(data.hacienda!.pin);
     }
     let cPass = actual.correo?.password || '';
-    if (data.correo?.password && !data.correo.password.includes('•••') && data.correo.password.trim() !== '') {
-      cPass = data.correo.password;
+    if (!isMaskedOrEmpty(data.correo?.password)) {
+      cPass = String(data.correo!.password);
     }
 
     const { password: _hp, pin: _hpn, ...haciendaPublic } = updatedHaciendaFull;
