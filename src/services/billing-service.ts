@@ -93,12 +93,51 @@ export async function listarPlanes(): Promise<PlanRecord[]> {
 
 export async function getGatewaysConfig(): Promise<GatewaysConfig> {
   const stored = await pgDataStore.getPlatformSetting<Partial<GatewaysConfig>>('payment_gateways');
+
+  const onvoEnv = (process.env.ONVO_ENVIRONMENT || process.env.ONVO_ENV || '').toLowerCase();
+
+  // Claves API de ONVO: resolución por entorno con fallback a variables genéricas
+  const envSecretKey = onvoEnv === 'live'
+    ? (process.env.ONVO_SECRET_KEY_LIVE || process.env.ONVO_SECRET_KEY)
+    : (process.env.ONVO_SECRET_KEY_SANDBOX || process.env.ONVO_SECRET_KEY);
+  const secretKey = envSecretKey || stored?.onvopay?.secretKey || DEFAULT_GATEWAYS.onvopay.secretKey;
+
+  const envPublicKey = onvoEnv === 'live'
+    ? (process.env.ONVO_PUBLIC_KEY_LIVE || process.env.ONVO_PUBLIC_KEY)
+    : (process.env.ONVO_PUBLIC_KEY_SANDBOX || process.env.ONVO_PUBLIC_KEY);
+  const publicKey = envPublicKey || stored?.onvopay?.publicKey || DEFAULT_GATEWAYS.onvopay.publicKey;
+
+  // Detección estricta de si la configuración activa es LIVE
+  const isLive = onvoEnv === 'live' || secretKey.includes('_live_') || secretKey.startsWith('sk_live_') || secretKey.startsWith('onvo_live_');
+
+  // Webhook Secret: Aislamiento riguroso entre Sandbox y LIVE.
+  // En LIVE: Requiere estrictamente ONVO_WEBHOOK_SECRET_LIVE (o un secreto que comience explícitamente con whsec_live_).
+  // Si NO existe secreto específico de LIVE, se retorna cadena vacía para bloquear de inmediato
+  // cualquier intento de procesar webhooks LIVE sin firma auténtica de producción.
+  let webhookSecret = '';
+  if (isLive) {
+    if (process.env.ONVO_WEBHOOK_SECRET_LIVE) {
+      webhookSecret = process.env.ONVO_WEBHOOK_SECRET_LIVE;
+    } else if (process.env.ONVO_WEBHOOK_SECRET && (process.env.ONVO_WEBHOOK_SECRET.startsWith('whsec_live_') || process.env.ONVO_WEBHOOK_SECRET.startsWith('live_'))) {
+      webhookSecret = process.env.ONVO_WEBHOOK_SECRET;
+    } else {
+      // Ausencia del secreto LIVE: queda intencionalmente vacío para impedir cobros
+      webhookSecret = '';
+    }
+  } else {
+    // En Sandbox: se usa el secreto de sandbox, ignorando cualquier secreto LIVE
+    webhookSecret = process.env.ONVO_WEBHOOK_SECRET_SANDBOX || 
+      process.env.ONVO_WEBHOOK_SECRET || 
+      stored?.onvopay?.webhookSecret || 
+      DEFAULT_GATEWAYS.onvopay.webhookSecret;
+  }
+
   return {
     pasarelaActiva: stored?.pasarelaActiva || (process.env.DEFAULT_GATEWAY as any) || DEFAULT_GATEWAYS.pasarelaActiva,
     onvopay: {
-      publicKey: process.env.ONVO_PUBLIC_KEY || stored?.onvopay?.publicKey || DEFAULT_GATEWAYS.onvopay.publicKey,
-      secretKey: process.env.ONVO_SECRET_KEY || stored?.onvopay?.secretKey || DEFAULT_GATEWAYS.onvopay.secretKey,
-      webhookSecret: process.env.ONVO_WEBHOOK_SECRET || stored?.onvopay?.webhookSecret || DEFAULT_GATEWAYS.onvopay.webhookSecret
+      publicKey,
+      secretKey,
+      webhookSecret
     },
     tilopay: { ...DEFAULT_GATEWAYS.tilopay, ...(stored?.tilopay || {}) },
     stripe: { ...DEFAULT_GATEWAYS.stripe, ...(stored?.stripe || {}) },
