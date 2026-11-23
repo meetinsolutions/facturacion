@@ -266,8 +266,24 @@ app.get('/', (req: Request, res: Response, next: NextFunction) => {
   res.sendFile(path.join(process.cwd(), 'public', 'landing.html'));
 });
 
-// Health check para observabilidad, monitoreo y pruebas de disponibilidad
-app.get(['/api/health', '/api/public/health'], async (req: Request, res: Response) => {
+// Health check público y minimalista (cero exposición de arquitectura interna o latencias)
+app.get('/api/public/health', async (req: Request, res: Response) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString()
+    });
+  } catch (err: any) {
+    res.status(503).json({
+      status: 'error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Health check detallado para monitoreo interno y observabilidad
+app.get('/api/health', async (req: Request, res: Response) => {
   try {
     const start = Date.now();
     await pool.query('SELECT 1');
