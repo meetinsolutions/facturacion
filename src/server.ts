@@ -1680,6 +1680,39 @@ app.post('/api/facturas/:clave/enviar-correo', ah(async (req, res) => {
   }
 }));
 
+app.post('/api/facturas/:clave/consultar-hacienda', ah(async (req, res) => {
+  const t = tid(req);
+  const clave = String(req.params.clave);
+  const item = await pgDataStore.getComprobanteByClave(t, clave);
+  if (!item) {
+    return res.status(404).json({ success: false, error: 'Comprobante no encontrado.' });
+  }
+
+  const config = await pgDataStore.getConfig(t);
+  const user = config.hacienda?.usuario;
+  const pass = config.hacienda?.password;
+  if (!user || !pass) {
+    return res.status(400).json({ success: false, error: 'Credenciales de Hacienda no configuradas.' });
+  }
+
+  const { motor } = await crearMotorParaTenant(t, config);
+  const consulta = await motor.consultarEstado(clave);
+
+  const nuevoEstado = consulta.indEstado || item.estadoHacienda;
+  const updated = await pgDataStore.updateComprobanteEstadoHacienda(t, clave, nuevoEstado, consulta.respuestaXml);
+
+  res.json({
+    success: true,
+    data: {
+      clave: consulta.clave,
+      estadoHacienda: nuevoEstado,
+      fechaRespuesta: consulta.fecha,
+      tieneRespuestaXml: Boolean(consulta.respuestaXml),
+      comprobante: updated
+    }
+  });
+}));
+
 app.get('/api/reportes/caja', ah(async (req, res) => {
   const p = getFechaPartesCR(new Date());
   const hoyCR = `${p.anioCompleto}-${p.mes}-${p.dia}`;

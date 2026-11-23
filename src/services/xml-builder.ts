@@ -63,6 +63,41 @@ function getRootElement(tipoDoc: TipoDocumento): { rootName: string; schemaUrl: 
  * Construye el XML oficial según la especificación DGT v4.3 de Costa Rica
  */
 export function generarXMLFactura(doc: ComprobanteElectronico, secuencia: number): { xml: string; clave: string; consecutivo: string } {
+  // 0. Validaciones normativas DGT v4.3
+  if (!(doc.fechaEmision instanceof Date) || Number.isNaN(doc.fechaEmision.getTime())) {
+    throw new Error('La fecha de emisión del comprobante es inválida.');
+  }
+
+  if (!doc.emisor?.identificacion?.numero) {
+    throw new Error('El emisor debe tener un número de identificación válido.');
+  }
+
+  if (!doc.emisor.actividadEconomica || !/^\d{6}$/.test(doc.emisor.actividadEconomica)) {
+    throw new Error(`El código de actividad económica del emisor debe tener exactamente 6 dígitos numéricos. Recibido: "${doc.emisor.actividadEconomica}"`);
+  }
+
+  if (doc.tipoDocumento === '01' && (!doc.receptor || !doc.receptor.identificacion?.numero)) {
+    throw new Error('La Factura Electrónica (01) requiere obligatoriamente la identificación del Receptor según la normativa DGT v4.3.');
+  }
+
+  if ((doc.tipoDocumento === '02' || doc.tipoDocumento === '03') && !doc.informacionReferencia) {
+    throw new Error(`Las notas de débito y crédito (${doc.tipoDocumento}) requieren obligatoriamente el nodo InformacionReferencia según la normativa DGT v4.3.`);
+  }
+
+  if (doc.resumen?.codigoMoneda && doc.resumen.codigoMoneda !== 'CRC' && (!doc.resumen.tipoCambio || doc.resumen.tipoCambio <= 0)) {
+    throw new Error(`El comprobante en moneda ${doc.resumen.codigoMoneda} requiere obligatoriamente un TipoCambio válido mayor a cero.`);
+  }
+
+  if (!Array.isArray(doc.lineas) || doc.lineas.length === 0) {
+    throw new Error('El comprobante debe contener al menos una línea de detalle.');
+  }
+
+  for (const item of doc.lineas) {
+    if (!item.codigoCabys || !/^\d{13}$/.test(item.codigoCabys)) {
+      throw new Error(`El código CAByS de la línea ${item.numeroLinea} debe tener exactamente 13 dígitos numéricos. Recibido: "${item.codigoCabys}"`);
+    }
+  }
+
   const { rootName, schemaUrl } = getRootElement(doc.tipoDocumento);
 
   // 1. Asegurar consecutivo y clave si no vienen asignados

@@ -578,6 +578,22 @@ export class PgDataStore {
     return res.rowCount ? mapComprobanteRow(res.rows[0]) : undefined;
   }
 
+  async updateComprobanteEstadoHacienda(
+    tenantId: string,
+    clave: string,
+    estadoHacienda: string,
+    respuestaXml?: string
+  ): Promise<ComprobanteGuardado | undefined> {
+    const res = await pool.query(
+      `UPDATE comprobantes
+       SET estado_hacienda = $3
+       WHERE tenant_id = $1 AND clave = $2
+       RETURNING *`,
+      [tenantId, clave, estadoHacienda]
+    );
+    return res.rowCount ? mapComprobanteRow(res.rows[0]) : undefined;
+  }
+
   async deleteComprobante(tenantId: string, clave: string): Promise<{ deleted: boolean; reason?: string }> {
     const item = await this.getComprobanteByClave(tenantId, clave);
     if (!item) {
